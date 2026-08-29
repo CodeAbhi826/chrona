@@ -23,7 +23,7 @@ import time
 TITLES = {
     "firefox": [
         "Arch Wiki — pacman",
-        "GitHub · chrona-linux/chrona",
+        "GitHub · CodeAbhi826/chrona",
         "Hacker News",
         "r/linux — Reddit",
         "Gmail — Inbox (3)",

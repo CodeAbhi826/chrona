@@ -1,82 +1,106 @@
+<div align="center">
+
+<img src="assets/icon.svg" width="128" alt="Chrona icon" />
+
 # Chrona
 
-**Digital wellbeing for every Linux desktop.** Screen time, per-app usage, category breakdowns and daily goals — with a Material You dashboard, a tiny always-on daemon, and **zero network access. Ever.**
+**Digital wellbeing for every Linux desktop.**
 
-<p>
-  <img alt="license" src="https://img.shields.io/badge/license-MIT-blue.svg">
-  <img alt="platform" src="https://img.shields.io/badge/platform-Linux-1793D1?logo=linux&logoColor=white">
-  <img alt="made with" src="https://img.shields.io/badge/made%20with-Rust%20%2B%20Slint-DEA584">
-</p>
+Screen time, per-app usage, category breakdowns and daily goals —
+a Material You dashboard on top of a tiny Rust daemon.
+**Zero network access. Ever.**
 
-<p align="center">
-  <img src="assets/logo.svg" width="96" alt="Chrona logo">
-</p>
+[![CI](https://github.com/CodeAbhi826/chrona/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeAbhi826/chrona/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/badge/release-v0.2.0-0B57D0)](https://github.com/CodeAbhi826/chrona/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Linux-1793D1?logo=linux&logoColor=white)](#compositor-support)
+[![Network](https://img.shields.io/badge/network-none-success)](#does-chrona-ever-touch-the-network)
+[![Made with Rust + Slint](https://img.shields.io/badge/made%20with-Rust%20%2B%20Slint-DEA584)](#architecture)
 
-Chrona is a from-scratch, Google-Digital-Wellbeing-style time tracker for the Linux desktop:
+[Features](#features) · [Screenshots](#screenshots) · [Install](#install) · [Compositor support](#compositor-support) · [Comparison](#how-chrona-compares) · [Scripting](#scripting-the-daemon) · [Roadmap](#roadmap) · [FAQ](#faq)
 
-- **Today / Week / Month dashboards** — total screen time, day timeline strip, hourly timeline, category donut, per-day stacked bars, month heatmap, week-over-week comparison.
-- **Per-app and per-window detail** — every app gets usage time, session counts and its most-used window titles (documents, sites, projects). PWAs (installed web apps) are tracked as first-class apps with their own name and icon.
-- **Smart categorisation** — built-in rules map apps to Work / Browsers / Communication / Media / Creative / Games / System, and title rules catch streaming inside browsers (Netflix in Firefox counts as *Media*, not *Browsers*). Your own rules always win.
-- **Real app names and icons** — the daemon resolves window ids against freedesktop `.desktop` entries (StartupWMClass, exec name, PWA app-ids), so rows show "LibreOffice Writer" with its real icon, not a machine id. Served to both the native UI and the web demo.
-- **Daily goals** — an overall **screen-time goal** plus per-app or per-category daily limits; exceeded limits are flagged on the dashboard, and the daemon runs an escalating notification sequence: a heads-up at 90 % of a limit, a critical notification the moment it is crossed, and optional reminders every 15 minutes while you stay over it.
-- **AFK-aware** — idle and lock-screen time is detected and subtracted (and shown as *away* time), so "screen time" means *actually at the machine*, with an Android-style **unlocks** counter.
-- **Pause tracking** — one switch (Settings, or the API) suspends recording; paused time is counted as away, never as usage.
-- **Native and lightweight** — a Rust daemon (~10 MB RAM, systemd user service) plus a GPU-accelerated Slint GUI. No Electron, no Chromium, no browser engine — the whole stack idles around ~50 MB.
-- **Private by architecture** — storage is one local SQLite file, the API is a Unix socket with `0600` permissions, and there is no telemetry, sync or network code to opt out of. Export everything to JSON or CSV anytime.
+<img src="docs/screenshots/today.png" width="880" alt="Chrona — Today dashboard with screen-time ring, hourly timeline, and per-app list with real icons" />
+
+</div>
+
+---
+
+Chrona is a from-scratch, [Digital Wellbeing](https://www.android.com/digital-wellbeing/)-style
+time tracker for the Linux desktop. A ~10 MB Rust daemon records which window
+is focused and subtracts the time you were away; a native Slint GUI (or the
+browser demo) turns that into rings, timelines and heatmaps; and a rules
+engine maps everything to categories you can re-edit at any time. Storage is
+one SQLite file on your disk — there is no account, no sync and no telemetry,
+because there is no network code at all.
+
+## Features
+
+- **Today / Week / Month dashboards** — screen-time ring with goal progress, day timeline strip, hourly activity bars, category donut, per-day stacked bars, month heatmap and week-over-week comparison.
+- **Per-app and per-window detail** — every app gets usage time, session counts and its most-used window titles (documents, sites, projects), expandable right in the list.
+- **Real app names and icons** — window IDs are resolved against freedesktop `.desktop` entries (`StartupWMClass`, exec name, PWA app-id), so rows show *LibreOffice Writer* with its real icon, not a machine ID.
+- **PWAs as first-class apps** — installed web apps (Chrome/Brave "Install app…") get their own name, icon and stats instead of counting as browser time.
+- **Smart categorisation** — built-in rules map apps to Work / Browsers / Communication / Media / Creative / Games / System, and title rules catch streaming inside browsers (Netflix in Firefox counts as *Media*, not *Browsers*). Your rules always win — and editing one re-categorises your entire history, because rules run at query time.
+- **Goals that escalate** — an overall screen-time goal plus per-app or per-category daily limits. You get a heads-up at 90 % of a limit, a critical notification the moment it is crossed, and optional reminders every 15 minutes while you stay over it.
+- **AFK-aware by design** — idle and lock-screen time is detected and subtracted (and shown as *away* time), so screen time means *actually at the machine*, with an Android-style unlocks counter.
+- **Pause tracking** — one switch (Settings, or the API) suspends recording; paused time counts as away, never as usage.
+- **Native and lightweight** — Rust daemon (systemd user service, ~10 MB RAM) plus a GPU-accelerated Slint GUI. No Electron, no Chromium, no browser engine — the whole stack idles around ~50 MB.
+- **Private by architecture** — one local SQLite file, a Unix-socket API with `0600` permissions, and no telemetry, sync or network code to opt out of. Export everything to JSON or CSV anytime.
 
 ## Screenshots
 
-Captured from the live demo harness (`tools/demo`) — the real daemon, simulated watcher feed:
+Captured from the live demo harness ([`tools/demo`](tools/demo/README.md)) —
+the real daemon and rules engine, a simulated window-event feed, real icons
+resolved from `.desktop` files:
 
-<p align="center">
-  <img src="docs/screenshots/today-material-you.png" width="49%" alt="Today — Material You (default theme)">
-  <img src="docs/screenshots/today-windows.png" width="49%" alt="Today — expandable per-window titles">
-</p>
-<p align="center">
-  <img src="docs/screenshots/stats-material-you.png" width="49%" alt="Stats — per-day stacked, usage calendar, insights">
-  <img src="docs/screenshots/timers-material-you.png" width="49%" alt="Timers — daily limits per app/category">
-</p>
-<p align="center">
-  <img src="docs/screenshots/focus-material-you.png" width="49%" alt="Focus — session timer">
-  <img src="docs/screenshots/today-dark.png" width="49%" alt="Today — dark theme">
-</p>
+| Today — dashboards, goals, real icons | Today — expandable per-window titles |
+|---|---|
+| <img src="docs/screenshots/today.png" width="430" alt="Today view" /> | <img src="docs/screenshots/today-windows.png" width="430" alt="Per-window titles" /> |
 
-## Compositor support
+| Stats — week bars, heatmap, insights | Timers — daily limits per app / category |
+|---|---|
+| <img src="docs/screenshots/stats.png" width="430" alt="Stats view" /> | <img src="docs/screenshots/timers.png" width="430" alt="Timers view" /> |
 
-| Session | Window tracking | Idle tracking | Notes |
-|---|---|---|---|
-| **KDE Plasma 6 (Wayland)** | ✅ KWin script → D-Bus | ✅ ScreenSaver D-Bus | One-click install from Settings |
-| **Sway / Hyprland / river / niri** (Wayland) | ✅ `wlr-foreign-toplevel` | ✅ `ext-idle-notify` | Works out of the box |
-| **Any X11 session** (incl. KDE/GNOME on X11) | ✅ EWMH polling | ✅ MIT-SCREEN-SAVER | Works out of the box |
-| **GNOME Wayland** | ⚠️ v0.2: no window events | ✅ ScreenSaver D-Bus | Needs a GNOME Shell extension — see [the roadmap](#roadmap) |
-| PWAs | ✅ | ✅ | PWAs are separate windows with their own titles, so they are tracked like any app |
+| Bedtime — schedule + greyscale preview | Today — dark theme |
+|---|---|
+| <img src="docs/screenshots/bedtime.png" width="430" alt="Bedtime view" /> | <img src="docs/screenshots/today-dark.png" width="430" alt="Today, dark theme" /> |
 
-KDE Wayland deserves a note: KWin intentionally does not implement the
-`wlr-foreign-toplevel` protocol other compositors use. Chrona ships a tiny
-KWin script (~30 lines) that reports window activations over the session
-bus — the same trick nothing else on the market combines with a full GUI.
+<details>
+<summary><b>More screenshots</b> — Focus timer, Settings, Stats in dark</summary>
+
+| Focus — session timer | Settings |
+|---|---|
+| <img src="docs/screenshots/focus.png" width="430" alt="Focus view" /> | <img src="docs/screenshots/settings.png" width="430" alt="Settings view" /> |
+
+<img src="docs/screenshots/stats-dark.png" width="620" alt="Stats, dark theme" />
+
+</details>
 
 ## Install
 
-### Arch Linux (AUR)
+### From source (any distro)
+
+Requires [Rust](https://rustup.rs/) (stable) and a Linux desktop. The build is
+dependency-light — SQLite is bundled, Wayland/X11 libraries are loaded at
+runtime.
 
 ```bash
-yay -S chrona            # release build
-# or: yay -S chrona-git  # from source, tracks main
-```
-
-### From source
-
-```bash
-git clone https://github.com/chrona-linux/chrona
+git clone https://github.com/CodeAbhi826/chrona
 cd chrona
 cargo build --release -p chronad -p chrona
 install -Dm755 target/release/{chronad,chrona} -t ~/.local/bin/
 install -Dm644 packaging/chrona.service ~/.config/systemd/user/
 ```
 
-Requires: Rust (stable), a Linux desktop. The build is dependency-light —
-SQLite is bundled, Wayland/X11 are loaded at runtime.
+### Arch Linux
+
+An AUR package is planned; until then, build with the packaged
+[`PKGBUILD`](packaging/PKGBUILD) (installs binaries, systemd unit, `.desktop`
+entry and hicolor icons):
+
+```bash
+cd chrona/packaging
+makepkg -si
+```
 
 ### First run
 
@@ -85,8 +109,8 @@ systemctl --user enable --now chrona   # start the daemon at every login
 chrona                                 # open the dashboard
 ```
 
-On **KDE Plasma Wayland**, click **Install KWin watcher** in Chrona →
-Settings (or run `./kwin/install.sh`), then focus a few windows.
+On **KDE Plasma Wayland**, click **Install KWin watcher** in Chrona → Settings
+(or run `./kwin/install.sh`), then focus a few windows.
 
 On **Sway / Hyprland / river / niri / any X11 session**, tracking starts
 immediately — nothing to install.
@@ -108,7 +132,22 @@ events are fake:
 
 Details in [tools/demo/README.md](tools/demo/README.md).
 
-## The design, in one picture
+## Compositor support
+
+| Session | Window tracking | Idle tracking | Notes |
+|---|---|---|---|
+| **KDE Plasma 6 (Wayland)** | ✅ KWin script → D-Bus | ✅ ScreenSaver D-Bus | One-click install from Settings |
+| **Sway / Hyprland / river / niri** (Wayland) | ✅ `wlr-foreign-toplevel` | ✅ `ext-idle-notify` | Works out of the box |
+| **Any X11 session** (incl. KDE/GNOME on X11) | ✅ EWMH polling | ✅ MIT-SCREEN-SAVER | Works out of the box |
+| **GNOME Wayland** | ⚠️ v0.2: no window events | ✅ ScreenSaver D-Bus | Needs a GNOME Shell extension — see [the roadmap](#roadmap) |
+| PWAs | ✅ | ✅ | PWAs are separate windows with their own titles, so they are tracked like any app |
+
+KDE Wayland deserves a note: KWin intentionally does not implement the
+`wlr-foreign-toplevel` protocol other compositors use. Chrona ships a tiny
+KWin script (~30 lines) that reports window activations over the session
+bus — the same trick nothing else on the market combines with a full GUI.
+
+## Architecture
 
 ```
 ┌────────────────────────────── your session ──────────────────────────────┐
@@ -160,38 +199,76 @@ echo '{"id":3,"cmd":"rule.add","args":{"pattern":"kitty|konsole","field":"app","
 Editing rules re-categorises your **entire history** — categorisation happens
 at query time, never at write time.
 
-## Why not…?
+## How Chrona compares
 
-- **ActivityWatch?** Great tracker, web-based dashboard, but no goals, no
-  enforcement, and on KDE Wayland you need awatcher + workarounds. Chrona is
-  native, single-purpose and goal-oriented. (Full comparison:
-  [docs/COMPETITORS.md](docs/COMPETITORS.md).)
-- **Electron?** A wellbeing app that costs 300 MB of RAM to show you a ring
-  chart is its own punchline. Chrona is Rust end-to-end.
-- **A browser extension for per-URL tracking?** On the roadmap — PWAs and
-  app-mode windows already get title-level tracking for free.
+The short version (the [full matrix](docs/COMPETITORS.md) covers six tools
+and forty capabilities):
 
-## Fonts & theming
+| | Chrona | ActivityWatch | RescueTime | Google Digital Wellbeing |
+|---|---|---|---|---|
+| 100 % local, no account | ✅ | ✅ | ❌ cloud | ❌ device-linked |
+| Native (non-Electron) UI | ✅ Slint | 🟡 web dashboard | ❌ | n/a (phone) |
+| Overall screen-time goal | ✅ | ❌ | ❌ | ✅ |
+| Per-app / per-category limits | ✅ | ❌ | ✅ | ✅ |
+| Escalating limit alerts | ✅ 90 % → critical → nags | ❌ | 🟡 | 🟡 |
+| Real app names + icons | ✅ `.desktop` + icon theme | 🟡 | ✅ | ✅ |
+| PWA tracked as its own app | ✅ | 🟡 browser time | 🟡 | 🟡 |
+| KDE Plasma Wayland, out of the box | ✅ KWin script | 🟡 awatcher | ❌ | n/a |
+| Blocking / enforcement | ❌ roadmap | ❌ | ✅ premium | ✅ |
+| Per-URL browser tracking | ❌ roadmap | ✅ extension | ✅ extension | n/a |
 
-Material You light is the default; **Settings → Appearance** flips to the
-**dark theme**, and the choice persists. If
-[Google Sans](https://fonts.google.com/knowledge/catalog) is installed on
-your system Chrona uses it; otherwise it falls back to the bundled
-[Inter](https://rsms.me/inter/) (SIL OFL 1.1) — visually closest, legally
-bundlable.
+Honest summary: ActivityWatch tracks but has no goals layer; RescueTime and
+Cold Turkey enforce but are cloud-bound or closed-source; Digital Wellbeing
+is the UX gold standard but lives on your phone. Chrona is the local-first,
+goal-driven, native take for the Linux desktop.
 
 ## Roadmap
 
 - [ ] GNOME Wayland shell extension (window events)
-- [ ] Focus sessions with Do Not Disturb
-- [ ] Optional enforcement: soft blocking when a daily limit is hit
+- [ ] Enforcement: soft-block "take a break" screen when a limit is hit
+- [ ] Focus sessions wired to Do Not Disturb (KDE + GNOME D-Bus)
 - [ ] Per-day-of-week limit schedules (weekend vs weekday budgets)
+- [ ] Weekly report notification (Sunday-evening digest)
 - [ ] Wind-down schedule (grayscale/dim reminders)
 - [ ] Browser companion for per-URL granularity
-- [ ] Weekly report notification
 
 Feature gaps vs the competition are tracked in
 [docs/COMPETITORS.md](docs/COMPETITORS.md).
+
+## FAQ
+
+### Where does my data live?
+
+In one SQLite database — `~/.local/share/chrona/chrona.db` (WAL mode). Back
+it up, copy it between machines, inspect it with `sqlite3`, or delete it to
+start over. `export` dumps everything to JSON/CSV.
+
+### Does Chrona ever touch the network?
+
+No. There is no telemetry, no update pinger, no account, no sync — the
+binary contains no network client code at all. The daemon's only interface
+is a Unix-domain socket with `0600` permissions, readable only by your user.
+The architecture makes "it secretly phones home" impossible, not just
+promised.
+
+### What does it cost?
+
+~10 MB RAM for the daemon, ~50 MB for the GUI (GPU-accelerated Slint), a few
+seconds of CPU per day. The event pipeline folds window activations into
+second-resolution rows; a year of history stays in single-digit megabytes.
+
+### Why is GNOME Wayland only partially supported?
+
+GNOME Shell, like KDE's KWin, doesn't implement `wlr-foreign-toplevel` — and
+unlike KDE, it has no user-installable script hook. Window-event tracking
+needs a GNOME Shell extension (see the [roadmap](#roadmap)); idle tracking
+already works there today.
+
+### I'm on KDE Wayland and nothing is being tracked
+
+Install the KWin watcher: Chrona → Settings → **Install KWin watcher**, then
+switch windows a few times. See [docs/WATCHERS.md](docs/WATCHERS.md) for
+verification steps and troubleshooting.
 
 ## Contributing
 
@@ -202,7 +279,8 @@ deliberately pluggable: a new compositor is one new module in
 
 ## License
 
-[MIT](LICENSE) — Chrona contributors. Bundled Inter is [SIL OFL 1.1](assets/fonts/Inter-OFL.txt).
+[MIT](LICENSE) — Chrona contributors. Bundled Inter is
+[SIL OFL 1.1](assets/fonts/Inter-OFL.txt).
 
 Inspired by the UX of Google's Digital Wellbeing, and by years of
 ActivityWatch normalising local-only time tracking. Both are great; Chrona

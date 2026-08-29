@@ -4,7 +4,7 @@ pkgver=0.2.0
 pkgrel=1
 pkgdesc="Digital wellbeing for every Linux desktop - screen time, per-app stats and daily goals (KDE Wayland, wlroots, X11). 100% local."
 arch=(x86_64 aarch64)
-url="https://github.com/chrona-linux/chrona"
+url="https://github.com/CodeAbhi826/chrona"
 license=(MIT)
 depends=(gcc-libs)
 makedepends=(cargo)
@@ -41,7 +41,10 @@ package() {
 
     install -Dm644 packaging/chrona.service -t "$pkgdir/usr/lib/systemd/user/"
     install -Dm644 packaging/chrona.desktop -t "$pkgdir/usr/share/applications/"
-    install -Dm644 assets/logo.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/chrona.svg"
+    install -Dm644 assets/icon.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/chrona.svg"
+    install -Dm644 assets/icon-128.png "$pkgdir/usr/share/icons/hicolor/128x128/apps/chrona.png"
+    install -Dm644 assets/icon-256.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/chrona.png"
+    install -Dm644 assets/icon-512.png "$pkgdir/usr/share/icons/hicolor/512x512/apps/chrona.png"
 
     # KWin watcher script, used by `chrona` (Settings page) and kwin/install.sh
     install -dm755 "$pkgdir/usr/share/chrona/kwin"

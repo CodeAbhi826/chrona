@@ -103,6 +103,8 @@ class Handler(BaseHTTPRequestHandler):
             cand = os.path.join(WEB, os.path.basename(u.path))
             if os.path.isfile(cand):
                 return self._file(cand)
+        if u.path == "/icon.svg":
+            return self._file(os.path.join(REPO, "assets", "icon.svg"), cache="public, max-age=3600")
         if u.path in ("/logo.svg", "/favicon.svg"):
             return self._file(os.path.join(REPO, "assets", "logo.svg"), cache="public, max-age=3600")
         # bundled app icons (web demo only) — safe basename inside web/icons/
