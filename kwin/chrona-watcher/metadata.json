@@ -1,0 +1,20 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Chrona contributors",
+                "Email": "noreply@chrona.invalid"
+            }
+        ],
+        "Category": "KWin Scripts",
+        "Description": "Reports the active window to the Chrona digital-wellbeing daemon via D-Bus. 100% local.",
+        "EnabledByDefault": false,
+        "Id": "chrona-watcher",
+        "License": "MIT",
+        "Name": "Chrona Watcher",
+        "Version": "0.2.0"
+    },
+    "KPackageStructure": "KWin/Script",
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js"
+}

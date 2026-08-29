@@ -1,0 +1,274 @@
+import { Theme, AppItem, CatItem, ArcItem, HourItem, DayItem, WeekColumn, TitleItem, GoalItem } from "theme.slint";
+import { Card, NavItem } from "widgets.slint";
+import { TodayView } from "views/today.slint";
+import { WeekView } from "views/week.slint";
+import { MonthView } from "views/month.slint";
+import { AppsView } from "views/apps.slint";
+import { GoalsView } from "views/goals.slint";
+import { SettingsView } from "views/settings.slint";
+import { Button, ScrollView } from "std-widgets.slint";
+
+// Re-export so the Theme global is reachable from Rust (`app.global::<Theme>()`).
+export { Theme } from "theme.slint";
+
+export component ChronaApp inherits Window {
+    // ---- daemon state ----
+    in-out property <bool> daemon-online: false;
+    in-out property <string> status-watcher: "connecting…";
+    in-out property <string> status-current: "";
+    in-out property <int> page: 0;
+
+    // ---- today ----
+    in-out property <string> today-date-text: "—";
+    in-out property <string> today-total-text: "0m";
+    in-out property <string> today-ring-cmd: "";
+    in-out property <string> today-ring-caption: "of 8h budget";
+    in-out property <string> today-unlocks: "0";
+    in-out property <string> today-longest: "0m";
+    in-out property <[AppItem]> today-apps;
+    in-out property <[CatItem]> today-cats;
+    in-out property <[ArcItem]> today-cat-arcs;
+    in-out property <[HourItem]> today-hourly;
+
+    // ---- week ----
+    in-out property <[DayItem]> week-days;
+    in-out property <[AppItem]> week-apps;
+    in-out property <string> week-total-text: "0m";
+    in-out property <string> week-avg-text: "";
+    in-out property <string> week-delta-text: "";
+    in-out property <bool> week-delta-up: false;
+
+    // ---- month ----
+    in-out property <string> month-label: "";
+    in-out property <string> month-total-text: "0m";
+    in-out property <string> month-avg-text: "";
+    in-out property <string> month-busiest-text: "";
+    in-out property <[WeekColumn]> month-weeks;
+    in-out property <[AppItem]> month-apps;
+
+    // ---- apps ----
+    in-out property <[AppItem]> apps-list;
+    in-out property <[TitleItem]> app-titles;
+    in-out property <string> apps-search: "";
+    in-out property <string> selected-app: "";
+    in-out property <string> app-detail-name: "";
+    in-out property <string> app-detail-total: "0m";
+    in-out property <string> app-detail-sessions: "0";
+
+    // ---- goals ----
+    in-out property <[GoalItem]> goals;
+    in-out property <[string]> goal-suggestions;
+
+    // ---- settings ----
+    in-out property <string> version-line: "";
+    in-out property <string> idle-line: "";
+    in-out property <string> kwin-status: "";
+    in-out property <string> export-path: "";
+    in-out property <string> db-path: "";
+    in-out property <bool> tracking-paused: false;
+
+    // ---- callbacks to Rust ----
+    callback toggle-theme(bool);
+    callback toggle-pause(bool);
+    callback select-app(string);
+    callback search-apps(string);
+    callback add-goal(string, string, float);
+    callback remove-goal(int);
+    callback toggle-goal(int, bool);
+    callback goal-kind-changed(string);
+    callback install-kwin();
+    callback do-export();
+    callback refresh();
+
+    title: "Chrona";
+    preferred-width: 1280px;
+    preferred-height: 820px;
+    min-width: 1240px;
+    min-height: 700px;
+    background: Theme.bg;
+    in-out property <string> font-family: "Google Sans";
+    default-font-family: root.font-family;
+
+    VerticalLayout {
+        // ---------- top bar ----------
+        Rectangle {
+            height: 64px;
+            background: Theme.surface;
+            HorizontalLayout {
+                padding-left: 20px;
+                padding-right: 20px;
+                spacing: 11px;
+                // brand mark (ring)
+                Rectangle {
+                    width: 32px; height: 32px;
+                    border-radius: 16px;
+                    background: transparent;
+                    border-width: 4px;
+                    border-color: Theme.accent;
+                    y: (parent.height - self.height) / 2;
+                    Rectangle {
+                        width: 4px; height: 11px; border-radius: 2px;
+                        background: Theme.text;
+                        x: (parent.width - self.width) / 2;
+                        y: 4px;
+                    }
+                    Rectangle {
+                        width: 8px; height: 3px; border-radius: 2px;
+                        background: Theme.text;
+                        x: parent.width / 2;
+                        y: parent.height / 2 - 1px;
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 3px;
+                    Text {
+                        text: "Chrona";
+                        font-size: 19px;
+                        font-weight: 700;
+                        color: Theme.text;
+                    }
+                    Text {
+                        text: "Digital wellbeing for Linux";
+                        font-size: 10.5px;
+                        color: Theme.text-dim;
+                    }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                // recording chip
+                Rectangle {
+                    height: 32px;
+                    border-radius: 16px;
+                    background: Theme.surface-2;
+                    y: (parent.height - self.height) / 2;
+                    HorizontalLayout {
+                        padding-left: 13px;
+                        padding-right: 13px;
+                        spacing: 7px;
+                        alignment: center;
+                        Rectangle {
+                            width: 8px; height: 8px; border-radius: 4px;
+                            background: root.daemon-online ? Theme.ok : Theme.danger;
+                        }
+                        Text {
+                            text: root.daemon-online ? "Recording" : "Daemon offline";
+                            font-size: 12px;
+                            font-weight: 600;
+                            color: Theme.text;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+        Rectangle { height: 1px; background: Theme.stroke; }
+
+        HorizontalLayout {
+            // ---------- soft nav rail (unboxed: sits on the page background) ----------
+            VerticalLayout {
+                width: 200px;
+                padding: 20px;
+                padding-top: 22px;
+                spacing: 4px;
+                NavItem { label: "Today"; active: root.page == 0; clicked => { root.page = 0; } }
+                NavItem { label: "Week"; active: root.page == 1; clicked => { root.page = 1; } }
+                NavItem { label: "Month"; active: root.page == 2; clicked => { root.page = 2; } }
+                NavItem { label: "Apps"; active: root.page == 3; clicked => { root.page = 3; } }
+                NavItem { label: "Goals"; active: root.page == 4; clicked => { root.page = 4; } }
+                NavItem { label: "Settings"; active: root.page == 5; clicked => { root.page = 5; } }
+                Rectangle { vertical-stretch: 1; }
+            }
+
+            // ---------- content ----------
+            Rectangle {
+                if !root.daemon-online: VerticalLayout {
+                    padding: 40px;
+                    alignment: center;
+                    Card {
+                        title: "Chrona daemon is not running";
+                        min-width: 520px;
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 12px;
+                            Text {
+                                text: "Start it once and it will follow you into every login:\n\nsystemctl --user enable --now chrona\n\nOn KDE Plasma Wayland, also install the KWin watcher from Settings.";
+                                font-size: 14px;
+                                color: Theme.text;
+                                horizontal-alignment: center;
+                            }
+                            Button {
+                                text: "Retry connection";
+                                clicked => { root.refresh(); }
+                            }
+                        }
+                    }
+                }
+                if root.daemon-online: VerticalLayout {
+                    padding: 24px;
+                    spacing: 16px;
+                    if root.page == 0: TodayView {
+                        date-text: root.today-date-text;
+                        total-text: root.today-total-text;
+                        ring-cmd: root.today-ring-cmd;
+                        ring-caption: root.today-ring-caption;
+                        unlocks-text: root.today-unlocks;
+                        longest-text: root.today-longest;
+                        current-window: root.status-current;
+                        apps: root.today-apps;
+                        cats: root.today-cats;
+                        cat-arcs: root.today-cat-arcs;
+                        hourly: root.today-hourly;
+                    }
+                    if root.page == 1: WeekView {
+                        days: root.week-days;
+                        apps: root.week-apps;
+                        total-text: root.week-total-text;
+                        avg-text: root.week-avg-text;
+                        delta-text: root.week-delta-text;
+                        delta-up: root.week-delta-up;
+                    }
+                    if root.page == 2: MonthView {
+                        label: root.month-label;
+                        total-text: root.month-total-text;
+                        avg-text: root.month-avg-text;
+                        busiest-text: root.month-busiest-text;
+                        weeks: root.month-weeks;
+                        apps: root.month-apps;
+                    }
+                    if root.page == 3: AppsView {
+                        apps: root.apps-list;
+                        titles: root.app-titles;
+                        search: root.apps-search;
+                        selected-name: root.app-detail-name;
+                        detail-total: root.app-detail-total;
+                        detail-sessions: root.app-detail-sessions;
+                        search-changed(t) => { root.search-apps(t); }
+                        app-selected(id) => { root.select-app(id); }
+                    }
+                    if root.page == 4: GoalsView {
+                        goals: root.goals;
+                        suggestions: root.goal-suggestions;
+                        add-goal(kind, key, minutes) => { root.add-goal(kind, key, minutes); }
+                        remove-goal(id) => { root.remove-goal(id); }
+                        toggle-goal(id, on) => { root.toggle-goal(id, on); }
+                        kind-changed(kind) => { root.goal-kind-changed(kind); }
+                    }
+                    if root.page == 5: SettingsView {
+                        dark: Theme.dark;
+                        watcher-line: root.status-watcher;
+                        idle-line: root.idle-line;
+                        version-line: root.version-line;
+                        kwin-status: root.kwin-status;
+                        export-path: root.export-path;
+                        db-path: root.db-path;
+                        paused: root.tracking-paused;
+                        toggle-theme(on) => { root.toggle-theme(on); }
+                        toggle-pause(on) => { root.toggle-pause(on); }
+                        install-kwin => { root.install-kwin(); }
+                        do-export => { root.do-export(); }
+                    }
+                }
+            }
+        }
+    }
+}

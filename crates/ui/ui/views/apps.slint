@@ -1,0 +1,109 @@
+import { Theme, AppItem, TitleItem } from "../theme.slint";
+import { Card, AppRow, HBar } from "../widgets.slint";
+import { LineEdit, ScrollView } from "std-widgets.slint";
+
+export component AppsView inherits Rectangle {
+    in property <[AppItem]> apps;
+    in property <[TitleItem]> titles;
+    in property <string> search;
+    in property <string> selected-name;
+    in property <string> detail-total;
+    in property <string> detail-sessions;
+    callback search-changed(string);
+    callback app-selected(string);
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: 16px;
+        Card {
+            title: "All applications — last 30 days";
+            vertical-stretch: 1;
+            LineEdit {
+                text: root.search;
+                placeholder-text: "Search apps…";
+                edited(text) => { root.search-changed(text); }
+            }
+            if root.apps.length == 0: Text {
+                text: "Nothing recorded yet. Give it a day.";
+                color: Theme.text-dim;
+                font-size: 13px;
+            }
+            ScrollView {
+                VerticalLayout {
+                    spacing: 2px;
+                    for a in root.apps: AppRow {
+                        name: a.name;
+                        share: a.share;
+                        time-text: a.month-text;
+                        clickable: true;
+                        selected: a.name == root.selected-name;
+                        clicked => { root.app-selected(a.app-id); }
+                    }
+                }
+            }
+        }
+        Card {
+            title: root.selected-name != "" ? root.selected-name : "App details";
+            preferred-width: 340px;
+            if root.selected-name == "": Text {
+                text: "Select an app to see its windows and sites — every title is tracked locally, never uploaded.";
+                color: Theme.text-dim;
+                font-size: 13px;
+                wrap: word-wrap;
+            }
+            if root.selected-name != "": VerticalLayout {
+                spacing: 14px;
+                HorizontalLayout {
+                    spacing: 12px;
+                    Rectangle {
+                        height: 64px;
+                        border-radius: Theme.radius;
+                        background: Theme.surface-2;
+                        vertical-stretch: 0;
+                        HorizontalLayout {
+                            padding: 14px;
+                            spacing: 18px;
+                            VerticalLayout {
+                                alignment: center;
+                                Text { text: root.detail-total; font-size: 20px; font-weight: 700; color: Theme.text; }
+                                Text { text: "last 7 days"; font-size: 11px; color: Theme.text-dim; }
+                            }
+                        }
+                    }
+                }
+                Text {
+                    text: "Most time in";
+                    color: Theme.text-dim;
+                    font-size: 12.5px;
+                    font-weight: 600;
+                }
+                if root.titles.length == 0: Text {
+                    text: "No window titles recorded.";
+                    color: Theme.text-dim;
+                    font-size: 12.5px;
+                }
+                for t in root.titles: Rectangle {
+                    height: 40px;
+                    border-radius: 8px;
+                    background: Theme.surface-2;
+                    VerticalLayout {
+                        padding: 8px;
+                        padding-left: 12px;
+                        spacing: 3px;
+                        Text {
+                            text: t.title == "" ? "(untitled window)" : t.title;
+                            font-size: 12px;
+                            color: Theme.text;
+                            overflow: elide;
+                        }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Text { text: t.seconds-text; font-size: 10.5px; color: Theme.text-dim; }
+                            Text { text: t.sessions-text; font-size: 10.5px; color: Theme.text-dim; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

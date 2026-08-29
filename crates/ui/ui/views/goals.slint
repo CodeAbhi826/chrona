@@ -1,0 +1,128 @@
+import { Theme, GoalItem } from "../theme.slint";
+import { Card, HBar } from "../widgets.slint";
+import { Button, ComboBox, LineEdit, ScrollView, Switch } from "std-widgets.slint";
+
+export component GoalsView inherits Rectangle {
+    in property <[GoalItem]> goals;
+    in property <[string]> suggestions;
+    callback add-goal(string, string, float);
+    callback remove-goal(int);
+    callback toggle-goal(int, bool);
+    callback kind-changed(string);
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            spacing: 16px;
+            Card {
+                title: "Daily limits";
+                Text {
+                    text: "Set a maximum per app or category. Chrona tracks progress here all day and flags everything you exceed.";
+                    color: Theme.text-dim;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+                if root.goals.length == 0: Text {
+                    text: "No limits yet. Add your first one below — e.g. category + media + 90 minutes.";
+                    color: Theme.text-dim;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+                for g in root.goals: Rectangle {
+                    height: 84px;
+                    border-radius: Theme.radius;
+                    background: Theme.surface-2;
+                    HorizontalLayout {
+                        padding: 14px;
+                        spacing: 14px;
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 5px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: start;
+                                Text {
+                                    text: g.label;
+                                    font-size: 14px;
+                                    font-weight: 600;
+                                    color: g.enabled ? Theme.text : Theme.text-dim;
+                                }
+                                Rectangle {
+                                    width: 74px; height: 18px; border-radius: 9px;
+                                    visible: g.exceeded;
+                                    background: Theme.danger.with-alpha(0.15);
+                                    Text {
+                                        text: "over limit";
+                                        font-size: 10px;
+                                        color: Theme.danger;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                        width: parent.width;
+                                    }
+                                }
+                            }
+                            HBar {
+                                share: g.progress;
+                                bar-color: g.exceeded ? Theme.danger : Theme.accent;
+                            }
+                            Text {
+                                text: g.used-text + " of " + g.limit-text + " today";
+                                font-size: 11.5px;
+                                color: Theme.text-dim;
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            Switch {
+                                checked: g.enabled;
+                                toggled => { root.toggle-goal(g.id, self.checked); }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            Button {
+                                text: "Remove";
+                                clicked => { root.remove-goal(g.id); }
+                            }
+                        }
+                    }
+                }
+            }
+            Card {
+                title: "Add a limit";
+                HorizontalLayout {
+                    spacing: 10px;
+                    kind-input := ComboBox {
+                        width: 140px;
+                        model: ["category", "app", "total"];
+                        current-value: "category";
+                        selected(value) => { root.kind-changed(value); }
+                    }
+                    key-input := ComboBox {
+                        width: 200px;
+                        model: root.suggestions;
+                    }
+                    mins-input := LineEdit {
+                        placeholder-text: "minutes per day";
+                        input-type: number;
+                        width: 150px;
+                    }
+                    Button {
+                        text: "Add limit";
+                        clicked => {
+                            root.add-goal(kind-input.current-value,
+                                          key-input.current-value,
+                                          mins-input.text.to-float());
+                        }
+                    }
+                }
+                Text {
+                    text: "Categories: work, browsers, communication, media, creative, gaming, system. Apps are suggested from your own usage — refreshes daily. Screen time covers everything combined.";
+                    font-size: 11.5px;
+                    color: Theme.text-dim;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}

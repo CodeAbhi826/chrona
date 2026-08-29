@@ -1,0 +1,111 @@
+// Chrona theme: light palette in the original Ditto palette (stone + teal)
+// as the default, dark theme as the toggle. The `dark` flag flips
+// every token; all views read colors only from here.
+
+export struct AppItem {
+    app-id: string,
+    name: string,
+    seconds: int,
+    seconds-text: string,
+    sessions: int,
+    share: float,
+    today-text: string,
+    week-text: string,
+    month-text: string,
+}
+
+export struct CatItem {
+    key: string,
+    label: string,
+    seconds: int,
+    seconds-text: string,
+    share: float,
+    pct-text: string,
+    // stacked-bar geometry within a range (fractions of column height)
+    v: float,
+    y0: float,
+}
+
+/// One ring arc, generated in Rust as an SVG path command
+/// (100×100 viewbox, radius 45, clockwise from 12 o'clock).
+export struct ArcItem {
+    cmd: string,
+    key: string,
+}
+
+export struct HourItem {
+    v: float,
+    label: string,
+}
+
+export struct DayItem {
+    date: string,
+    label: string,
+    seconds: int,
+    seconds-text: string,
+    v: float,
+    cats: [CatItem],
+}
+
+export struct HeatCell {
+    v: float,
+    label: string,
+    tip: string,
+    is-today: bool,
+}
+
+export struct WeekColumn {
+    cells: [HeatCell],
+}
+
+export struct TitleItem {
+    title: string,
+    seconds-text: string,
+    sessions-text: string,
+}
+
+export struct GoalItem {
+    id: int,
+    kind: string,
+    key: string,
+    label: string,
+    limit-text: string,
+    used-text: string,
+    progress: float,
+    enabled: bool,
+    exceeded: bool,
+}
+
+export global Theme {
+    // Light palette by default; dark theme when toggled.
+    in-out property <bool> dark: false;
+
+    out property <color> bg:          dark ? #0D1017 : #FAFAF9;
+    out property <color> surface:     dark ? #151924 : #FFFFFF;
+    out property <color> surface-2:   dark ? #1D2230 : #F5F5F4;
+    out property <color> surface-3:   dark ? #262C3D : #E7E5E4;
+    out property <color> stroke:      dark ? #272D3B : #E7E5E4;
+    out property <color> text:        dark ? #E7EAF3 : #1C1917;
+    out property <color> text-dim:    dark ? #99A1B5 : #78716C;
+    out property <color> accent:      dark ? #A9B7FF : #0D9488;
+    out property <color> accent-strong: dark ? #7B8CF6 : #0F766E;
+    out property <color> accent-soft: dark ? #272F52 : #CCFBF1;
+    out property <color> on-accent:   dark ? #0E1220 : #FFFFFF;
+    out property <color> ok:          dark ? #7FDCA8 : #059669;
+    out property <color> warn:        dark ? #FFCF7E : #D97706;
+    out property <color> danger:      dark ? #FF9C9C : #DC2626;
+
+    out property <length> radius: 14px;
+    out property <length> radius-lg: 22px;
+
+    public pure function cat-color(key: string, dark: bool) -> color {
+        if (key == "work") { return dark ? #8FB4FF : #0D9488; }
+        else if (key == "browsers") { return dark ? #74D9BF : #2563EB; }
+        else if (key == "communication") { return dark ? #FFBE85 : #EA580C; }
+        else if (key == "media") { return dark ? #D49CF5 : #7C3AED; }
+        else if (key == "creative") { return dark ? #FF97C2 : #DB2777; }
+        else if (key == "gaming") { return dark ? #84D7FA : #0891B2; }
+        else if (key == "system") { return dark ? #A9B1C2 : #64748B; }
+        return dark ? #828AA0 : #A8A29E;
+    }
+}

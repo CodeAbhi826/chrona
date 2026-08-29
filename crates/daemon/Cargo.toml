@@ -1,0 +1,32 @@
+[package]
+name = "chronad"
+description = "Chrona daemon — window watchers, AFK detection, storage and the local API"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "chronad"
+path = "src/main.rs"
+
+[features]
+default = ["dbus", "x11", "wayland"]
+dbus = ["dep:zbus"]
+x11 = ["dep:x11rb"]
+wayland = ["dep:wayland-client", "dep:wayland-protocols", "dep:wayland-protocols-wlr"]
+
+[dependencies]
+chrona-core = { workspace = true }
+chrona-store = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+libc = "0.2"
+zbus = { version = "4", optional = true }
+x11rb = { version = "0.13", optional = true, features = ["screensaver"] }
+wayland-client = { version = "0.31", optional = true }
+wayland-protocols = { version = "0.32", optional = true, features = ["client", "staging"] }
+wayland-protocols-wlr = { version = "0.3", optional = true, features = ["client"] }

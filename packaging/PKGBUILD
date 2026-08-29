@@ -1,0 +1,51 @@
+# Maintainer: Chrona contributors <noreply@chrona.invalid>
+pkgname=chrona
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="Digital wellbeing for every Linux desktop - screen time, per-app stats and daily goals (KDE Wayland, wlroots, X11). 100% local."
+arch=(x86_64 aarch64)
+url="https://github.com/chrona-linux/chrona"
+license=(MIT)
+depends=(gcc-libs)
+makedepends=(cargo)
+optdepends=(
+    "dbus: KWin script intake and screensaver-based idle detection"
+    "kwin: Chrona KWin script for Plasma Wayland window tracking"
+)
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=(SKIP)
+
+prepare() {
+    cd "$pkgname-$pkgver"
+    cargo fetch --locked --target "$CARCH-unknown-linux-gnu"
+}
+
+build() {
+    cd "$pkgname-$pkgver"
+    export CARGO_TARGET_DIR=target
+    export CARGO_PROFILE_RELEASE_LTO=thin
+    cargo build --frozen --release -p chronad -p chrona
+}
+
+check() {
+    cd "$pkgname-$pkgver"
+    export CARGO_TARGET_DIR=target
+    cargo test --frozen --workspace
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+
+    install -Dm755 target/release/chronad -t "$pkgdir/usr/bin/"
+    install -Dm755 target/release/chrona -t "$pkgdir/usr/bin/"
+
+    install -Dm644 packaging/chrona.service -t "$pkgdir/usr/lib/systemd/user/"
+    install -Dm644 packaging/chrona.desktop -t "$pkgdir/usr/share/applications/"
+    install -Dm644 assets/logo.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/chrona.svg"
+
+    # KWin watcher script, used by `chrona` (Settings page) and kwin/install.sh
+    install -dm755 "$pkgdir/usr/share/chrona/kwin"
+    cp -r kwin/chrona-watcher "$pkgdir/usr/share/chrona/kwin/"
+
+    install -Dm644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname/"
+}

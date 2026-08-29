@@ -1,0 +1,107 @@
+import { Theme } from "../theme.slint";
+import { Card } from "../widgets.slint";
+import { Button, LineEdit, ScrollView, Switch } from "std-widgets.slint";
+
+export component SettingsView inherits Rectangle {
+    in property <bool> dark;
+    in property <string> watcher-line;
+    in property <string> idle-line;
+    in property <string> version-line;
+    in property <string> kwin-status;
+    in property <string> export-path;
+    in property <string> db-path;
+    in property <bool> paused;
+    callback toggle-theme(bool);
+    callback toggle-pause(bool);
+    callback install-kwin();
+    callback do-export();
+    background: transparent;
+
+    ScrollView {
+        VerticalLayout {
+            spacing: 16px;
+            Card {
+                title: "Appearance";
+                HorizontalLayout {
+                    spacing: 14px;
+                    Text {
+                        text: "Dark theme";
+                        vertical-alignment: center;
+                        font-size: 14px;
+                        color: Theme.text;
+                    }
+                    Switch {
+                        checked: root.dark;
+                        toggled => { root.toggle-theme(self.checked); }
+                    }
+                }
+            }
+            Card {
+                title: "Tracking";
+                VerticalLayout {
+                    spacing: 8px;
+                    Text { text: "Watcher: " + root.watcher-line; font-size: 13px; color: Theme.text; wrap: word-wrap; }
+                    Text { text: "Idle detection: " + root.idle-line; font-size: 13px; color: Theme.text; wrap: word-wrap; }
+                    HorizontalLayout {
+                        spacing: 14px;
+                        Text {
+                            text: "Pause tracking";
+                            vertical-alignment: center;
+                            font-size: 14px;
+                            color: Theme.text;
+                        }
+                        Switch {
+                            checked: root.paused;
+                            toggled => { root.toggle-pause(self.checked); }
+                        }
+                    }
+                    Text {
+                        text: "All data stays local in " + root.db-path + " — no network access.";
+                        font-size: 12px;
+                        color: Theme.text-dim;
+                        wrap: word-wrap;
+                    }
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Button {
+                            text: "Install / update KWin watcher";
+                            clicked => { root.install-kwin(); }
+                        }
+                        Text {
+                            text: root.kwin-status;
+                            vertical-alignment: center;
+                            font-size: 12px;
+                            color: Theme.text-dim;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+            Card {
+                title: "Your data";
+                HorizontalLayout {
+                    spacing: 10px;
+                    Button {
+                        text: "Export JSON";
+                        clicked => { root.do-export(); }
+                    }
+                    Text {
+                        text: root.export-path != "" ? ("Saved to " + root.export-path) : "All recorded data, one JSON file.";
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: Theme.text-dim;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+            Card {
+                title: "About";
+                VerticalLayout {
+                    spacing: 4px;
+                    Text { text: "Chrona " + root.version-line; font-size: 13px; color: Theme.text; }
+                    Text { text: "Digital wellbeing for every Linux desktop. MIT licensed. github.com/chrona-linux/chrona"; font-size: 12px; color: Theme.text-dim; wrap: word-wrap; }
+                }
+            }
+        }
+    }
+}

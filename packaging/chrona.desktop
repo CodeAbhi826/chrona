@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Chrona
+GenericName=Digital Wellbeing
+Comment=Screen time, per-app usage and daily goals — 100% local
+Exec=chrona
+Icon=chrona
+Terminal=false
+Categories=Utility;System;Monitor;
+Keywords=screen time;wellbeing;usage;tracking;focus;
+StartupWMClass=chrona

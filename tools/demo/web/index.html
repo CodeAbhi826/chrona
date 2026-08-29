@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chrona — Digital wellbeing for Linux</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <button class="navtoggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="true" title="Toggle navigation">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M9.5 3v18"/></svg>
+    </button>
+    <div class="brand">
+      <span class="logo-tile">
+        <svg viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+      </span>
+      <div class="brand-text">
+        <span class="brand-name">Chrona</span>
+        <span class="brand-sub">Digital Wellbeing for Linux</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="rec-inline" id="recChip"><span class="rec-dot" id="recDot"></span><span id="recText">connecting…</span></span>
+      <span class="topbar-date" id="topDate"></span>
+      <button class="gear" id="gearBtn" aria-label="Open settings" title="Settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="rail" id="rail">
+    <button class="nav-item active" data-page="today" title="Today">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="label">Today</span></button>
+    <button class="nav-item" data-page="stats" title="Stats">
+      <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15v-4M12 15V7M17 15v-6"/></svg><span class="label">Stats</span></button>
+    <button class="nav-item" data-page="timers" title="Timers">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M9 2h6"/></svg><span class="label">Timers</span></button>
+    <button class="nav-item" data-page="focus" title="Focus">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/></svg><span class="label">Focus</span></button>
+    <button class="nav-item" data-page="bedtime" title="Bedtime">
+      <svg viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11Z"/></svg><span class="label">Bedtime</span></button>
+    <button class="nav-item" data-page="settings" title="Settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg><span class="label">Settings</span></button>
+  </nav>
+
+  <main id="main">
+
+    <!-- ======================= TODAY ======================= -->
+    <section class="page" id="page-today">
+      <div class="banner hidden" id="limitBanner"></div>
+      <div class="grid-hero">
+        <div class="card ring-card">
+          <div class="ring-wrap">
+            <svg class="ring" viewBox="-1 -1 102 102" width="230" height="230">
+              <circle cx="50" cy="50" r="45" fill="none" class="ring-track"/>
+              <path id="ringArc" fill="none" class="ring-progress" d=""/>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-total" id="todayTotal">0m</div>
+              <div class="ring-caption">screen time today</div>
+            </div>
+          </div>
+          <div class="chips chips3">
+            <div class="chip"><div class="chip-value" id="todayUnlocks">0</div><div class="chip-cap">unlocks</div></div>
+            <div class="chip"><div class="chip-value" id="todayLongest">0m</div><div class="chip-cap">longest session</div></div>
+            <div class="chip"><div class="chip-value" id="todayAway">0m</div><div class="chip-cap">away</div></div>
+          </div>
+          <div class="now-line" id="nowLine"></div>
+        </div>
+
+        <div class="card grow">
+          <div class="card-head">
+            <div>
+              <div class="card-title-big">Today's apps</div>
+              <div class="card-sub">Tap an app for its windows</div>
+            </div>
+            <div class="cat-mini" id="todayTopCat"></div>
+          </div>
+          <div class="empty hidden" id="todayAppsEmpty">No apps recorded yet — keep using your desktop.</div>
+          <div id="todayApps"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title-big">Timeline</div>
+            <div class="card-sub">apps across the day · by hour · <span id="todayPeak"></span></div>
+          </div>
+        </div>
+        <div class="empty hidden" id="hourlyEmpty">No activity yet today.</div>
+        <div class="day-strip" id="dayStrip" title="Apps across the day"></div>
+        <div class="hours" id="hours"></div>
+        <div class="hour-labels" id="hourLabels"></div>
+      </div>
+    </section>
+
+    <!-- ======================= STATS ======================= -->
+    <section class="page hidden" id="page-stats">
+      <div class="grid-3stat">
+        <div class="card">
+          <div class="card-title-big">This week</div>
+          <div class="big-num" id="weekTotal">0m</div>
+          <div class="sub-line" id="weekAvg"></div>
+          <div class="sub-line" id="weekDelta"></div>
+        </div>
+        <div class="card">
+          <div class="card-title-big">Top category</div>
+          <div class="donut-wrap">
+            <div class="donut-box">
+              <svg class="donut" viewBox="-1 -1 102 102" width="150" height="150">
+                <circle cx="50" cy="50" r="45" fill="none" class="ring-track"/>
+                <g id="donutArcs"></g>
+              </svg>
+              <div class="donut-hole"><span>this week</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title-big">Insights</div>
+          <div id="insights"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title-big">Per-day usage</div>
+            <div class="card-sub">stacked by category</div>
+          </div>
+        </div>
+        <div class="empty hidden" id="weekEmpty">No data for this week yet.</div>
+        <div class="cols" id="weekCols"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title-big" id="monthLabel">Usage calendar</div>
+            <div class="card-sub">darker = more screen time</div>
+          </div>
+        </div>
+        <div class="heat-weeks" id="heatWeeks"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title-big">Most used apps</div>
+            <div class="card-sub">week · month</div>
+          </div>
+        </div>
+        <div class="empty hidden" id="statAppsEmpty">No apps yet.</div>
+        <div id="statApps"></div>
+      </div>
+    </section>
+
+    <!-- ======================= TIMERS ======================= -->
+    <section class="page hidden" id="page-timers">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title-big">Daily timers &amp; limits</div>
+          </div>
+        </div>
+        <div class="empty" id="goalsEmpty">No timers yet.</div>
+        <div id="goalList"></div>
+      </div>
+      <div class="card">
+        <div class="card-title-big">Add a timer</div>
+        <div class="timer-form">
+          <select id="goalKind">
+            <option value="category">category</option>
+            <option value="app">app</option>
+            <option value="total">screen time</option>
+          </select>
+          <select id="goalKey"></select>
+          <div class="slider-box">
+            <input id="goalMins" type="number" min="1" placeholder="min">
+            <input id="goalRange" type="range" min="5" max="240" step="5" value="60">
+            <div class="slider-cap"><span id="goalRangeLabel">60 min / day</span></div>
+          </div>
+          <button class="btn filled" id="goalAdd">Add timer</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= FOCUS ======================= -->
+    <section class="page hidden" id="page-focus">
+      <div class="grid-hero">
+        <div class="card ring-card focus-card">
+          <div class="ring-wrap">
+            <svg class="ring" viewBox="-1 -1 102 102" width="230" height="230">
+              <circle cx="50" cy="50" r="45" fill="none" class="ring-track"/>
+              <path id="focusArc" fill="none" class="ring-progress" d=""/>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-total mono" id="focusClock">25:00</div>
+              <div class="ring-caption" id="focusState">ready to focus</div>
+            </div>
+          </div>
+          <div class="chips">
+            <button class="chip chip-btn" data-mins="15">15 min</button>
+            <button class="chip chip-btn" data-mins="25">25 min</button>
+            <button class="chip chip-btn" data-mins="45">45 min</button>
+            <button class="chip chip-btn" data-mins="60">60 min</button>
+          </div>
+          <div class="btn-row center">
+            <button class="btn filled" id="focusStart">Start focus</button>
+            <button class="btn ghost hidden" id="focusPause">Pause</button>
+            <button class="btn ghost hidden" id="focusEnd">End</button>
+          </div>
+          <div class="sub-line small center" id="focusDnd">Do Not Disturb is enabled during sessions.</div>
+        </div>
+
+        <div class="card grow">
+          <div class="card-head">
+            <div>
+              <div class="card-title-big">Session log</div>
+              <div class="card-sub" id="focusSummary">no sessions yet</div>
+            </div>
+          </div>
+          <div class="empty" id="focusEmpty">Completed sessions appear here.</div>
+          <div id="focusLog"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= BEDTIME ======================= -->
+    <section class="page hidden" id="page-bedtime">
+      <div class="grid-hero">
+        <div class="card ring-card">
+          <div class="moon-wrap">
+            <svg viewBox="0 0 24 24" class="moon"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11Z"/></svg>
+          </div>
+          <div class="bed-when" id="bedWhen">Bedtime is off</div>
+          <div class="sub-line center" id="bedSummary"></div>
+          <div class="setting-row">
+            <div class="setting-label">Enable bedtime schedule</div>
+            <div class="switch" id="bedEnable" role="switch" tabindex="0"></div>
+          </div>
+        </div>
+
+        <div class="card grow">
+          <div class="card-title-big">Schedule</div>
+          <div class="bed-form">
+            <label>Start<input type="time" id="bedStart" value="22:30"></label>
+            <label>End<input type="time" id="bedEnd" value="06:30"></label>
+          </div>
+          <div class="card-title-big" style="margin-top:6px">Repeats on</div>
+          <div class="day-chips" id="bedDays"></div>
+          <div class="setting-row" style="margin-top:8px">
+            <div class="setting-label">Greyscale the screen</div>
+            <div class="switch" id="bedGrey" role="switch" tabindex="0"></div>
+          </div>
+          <div class="preview-box">
+            <div class="preview-screen" id="bedPreview">
+              <span class="pv pv1"></span><span class="pv pv2"></span><span class="pv pv3"></span>
+              <div class="pv-text">desktop preview</div>
+            </div>
+            <div class="sub-line small">preview</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= SETTINGS ======================= -->
+    <section class="page hidden" id="page-settings">
+      <div class="card">
+        <div class="card-title-big">Appearance</div>
+        <div class="setting-row">
+          <div class="setting-label">Dark theme</div>
+          <div class="switch" id="themeSwitch" role="switch" tabindex="0" aria-label="Dark theme"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title-big">Tracking</div>
+        <div class="line" id="setWatcher"></div>
+        <div class="line" id="setIdle"></div>
+        <div class="setting-row" style="margin-top:10px">
+          <div class="setting-label">Pause tracking</div>
+          <div class="switch" id="pauseSwitch" role="switch" tabindex="0" aria-label="Pause tracking"></div>
+        </div>
+        <div class="sub-line small" id="setPrivacy"></div>
+        <div class="btn-row">
+          <button class="btn filled" id="kwinBtn" title="This button drives kpackagetool6 and only exists in the native app">Install / update KWin watcher</button>
+          <span class="sub-line small" id="kwinNote">Native app only — see docs/WATCHERS.md</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title-big">Notifications</div>
+        <div class="setting-row">
+          <div class="setting-label">Limit reached alerts</div>
+          <div class="switch" id="notifySwitch" role="switch" tabindex="0" aria-label="Limit reached alerts"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title-big">Your data</div>
+        <div class="btn-row">
+          <a class="btn filled" id="exportBtn" href="/api/export" download="chrona-export.json">Export JSON</a>
+          <button class="btn ghost" id="csvBtn">Export CSV</button>
+          <span class="sub-line small">All recorded data, one file.</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title-big">About</div>
+        <div class="line" id="aboutVersion"></div>
+        <div class="sub-line small">Digital wellbeing for every Linux desktop. MIT licensed. github.com/chrona-linux/chrona</div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="toast" id="toast"></div>
+
+<script src="/app.js"></script>
+<script src="/extras.js"></script>
+</body>
+</html>

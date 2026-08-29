@@ -1,0 +1,20 @@
+[package]
+name = "chrona"
+description = "Chrona — digital wellbeing for every Linux desktop (UI)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "chrona"
+path = "src/main.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+slint = "1"
+
+[build-dependencies]
+slint-build = "1"

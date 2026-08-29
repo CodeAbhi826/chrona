@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/store", "crates/daemon", "crates/ui"]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/chrona-linux/chrona"
+homepage = "https://github.com/chrona-linux/chrona"
+readme = "README.md"
+
+[workspace.dependencies]
+chrona-core = { path = "crates/core" }
+chrona-store = { path = "crates/store" }
+anyhow = "1"
+chrono = "0.4"
+regex = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
