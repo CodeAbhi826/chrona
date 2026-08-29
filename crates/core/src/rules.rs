@@ -145,6 +145,7 @@ pub fn default_rules() -> Vec<Rule> {
         "code|code-oss|code-insiders|vscodium|cursor|windsurf",
         "jetbrains-.*|idea|idea64|pycharm|webstorm|clion|goland|rider|datagrip|rustrover|android-studio",
         "nvim|vim|neovim|emacs|sublime_text|kate|gedit|lapce|helix|zed",
+        "libreoffice.*|onlyoffice-desktopeditors|calligrawords|wps-office",
         "postman|insomnia|beekeeper-studio|docker-desktop|virt-manager|godot",
     ] {
         v.push(app(p, Category::Work));

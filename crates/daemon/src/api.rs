@@ -2,6 +2,7 @@
 //! response per line). Used by the Chrona UI and available for scripting
 //! (`socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/chrona.sock`).
 
+use crate::icons::AppIndex;
 use crate::state::Tracker;
 use chrona_core::{rules::RuleSet, stats};
 use chrona_store::{Goal, Store};
@@ -24,6 +25,8 @@ pub struct Shared {
     /// User-level recording pause (ActivityWatch-style). Read by the state
     /// machine loop, set through the `pause.set` API command.
     pub paused: Arc<AtomicBool>,
+    /// .desktop entry index: pretty names, real icons, PWA detection.
+    pub icons: Mutex<AppIndex>,
 }
 
 impl Shared {
@@ -38,6 +41,11 @@ impl Shared {
         let paused = Arc::new(AtomicBool::new(
             store.setting("paused").ok().flatten().as_deref() == Some("1"),
         ));
+        let icons = AppIndex::scan_system();
+        eprintln!(
+            "[chronad] app index: {} entries from .desktop files",
+            icons.len()
+        );
         Ok(Self {
             store,
             tracker: Mutex::new(Tracker::new()),
@@ -46,6 +54,7 @@ impl Shared {
             idle_provider: Mutex::new("detecting…".into()),
             ruleset: Mutex::new(ruleset),
             paused,
+            icons: Mutex::new(icons),
         })
     }
 
@@ -184,6 +193,40 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
         }
 
         // ----- queries -----
+        "apps.meta" => {
+            // Resolve app ids to {name, icon, pwa} from .desktop entries.
+            // Refresh the index first so a freshly installed app shows up.
+            {
+                let mut idx = sh.icons.lock().unwrap();
+                idx.refresh_if_stale();
+            }
+            let idx = sh.icons.lock().unwrap();
+            let ids: Vec<String> = a
+                .get("ids")
+                .and_then(Value::as_array)
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(Value::as_str)
+                        .take(256)
+                        .map(str::to_string)
+                        .collect()
+                })
+                .unwrap_or_default();
+            let mut out = serde_json::Map::new();
+            for id in ids {
+                if let Some(m) = idx.lookup(&id) {
+                    out.insert(
+                        id,
+                        json!({
+                            "name": m.name,
+                            "icon": m.icon.as_ref().map(|p| p.display().to_string()),
+                            "pwa": m.pwa,
+                        }),
+                    );
+                }
+            }
+            Ok(json!(out))
+        }
         "day" => {
             let d = a
                 .get("date")

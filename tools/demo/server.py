@@ -26,8 +26,18 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 WEB = os.path.join(HERE, "web")
 
-GET_CMDS = {"status", "day", "week", "month", "app", "rules", "goals", "settings.get", "export", "ping"}
-POST_CMDS = {"goal.set", "goal.del", "rule.add", "rule.del", "settings.set", "pause.set"}
+GET_CMDS = {"status", "day", "week", "month", "app", "apps.meta", "rules", "goals", "settings.get", "export", "ping"}
+POST_CMDS = {"goal.set", "goal.del", "rule.add", "rule.del", "settings.set", "pause.set", "apps.meta"}
+
+# Roots the /sysicon endpoint may serve real app icons from (the daemon
+# resolves .desktop Icon= keys to files under these).
+ICON_ROOTS = [
+    "/usr/share/icons/",
+    "/usr/local/share/icons/",
+    "/usr/share/pixmaps/",
+    os.path.expanduser("~/.local/share/icons/"),
+    os.path.expanduser("~/.icons/"),
+]
 INT_KEYS = {"offset", "days", "id", "limit_seconds", "priority"}
 
 MIME = {
@@ -106,6 +116,19 @@ class Handler(BaseHTTPRequestHandler):
             return self._file(
                 os.path.join(REPO, "assets", "fonts", "Inter.ttf"), cache="public, max-age=86400"
             )
+
+        # real system app icons resolved by the daemon from .desktop files —
+        # only files under the known icon roots, resolved and checked
+        if u.path.startswith("/sysicon"):
+            q = parse_qs(u.query).get("p", [""])[0]
+            cand = os.path.realpath(q)
+            if os.path.isfile(cand) and any(
+                cand == os.path.realpath(r) or cand.startswith(os.path.realpath(r))
+                for r in ICON_ROOTS
+                if os.path.isdir(r)
+            ):
+                return self._file(cand, cache="public, max-age=3600")
+            return self._send(403, "forbidden", "text/plain")
 
         if u.path.startswith("/api/"):
             cmd = u.path[len("/api/"):]

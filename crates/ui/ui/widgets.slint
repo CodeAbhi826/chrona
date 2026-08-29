@@ -206,6 +206,8 @@ export component AppRow inherits Rectangle {
     in property <string> name;
     in property <float> share;
     in property <string> time-text;
+    in property <image> icon;
+    in property <bool> has-icon: false;
     in property <color> dot-color: Theme.accent;
     in property <bool> selected: false;
     in property <bool> clickable: false;
@@ -218,9 +220,21 @@ export component AppRow inherits Rectangle {
         padding-right: 8px;
         spacing: 10px;
         Rectangle {
-            width: 10px; height: 10px; border-radius: 5px;
-            background: dot-color;
-            y: parent.height / 2 - 5px;
+            width: 24px; height: 24px;
+            y: parent.height / 2 - 12px;
+            border-radius: 6px;
+            if !root.has-icon: Rectangle {
+                width: 10px; height: 10px; border-radius: 5px;
+                background: dot-color;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+            }
+            if root.has-icon: Image {
+                source: root.icon;
+                width: parent.width;
+                height: parent.height;
+                image-fit: contain;
+            }
         }
         Text {
             text: name;

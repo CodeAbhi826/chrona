@@ -35,6 +35,8 @@ export component AppsView inherits Rectangle {
                         name: a.name;
                         share: a.share;
                         time-text: a.month-text;
+                        icon: a.icon;
+                        has-icon: a.has-icon;
                         clickable: true;
                         selected: a.name == root.selected-name;
                         clicked => { root.app-selected(a.app-id); }

@@ -36,6 +36,7 @@ POOL = [
     ("krita", 0.04),
     ("figma", 0.04),
     ("kate", 0.03),
+    ("libreoffice-writer", 0.03),
 ]
 
 DEMO_GOALS = [

@@ -7,6 +7,7 @@
 mod api;
 #[cfg(feature = "dbus")]
 mod dbus;
+mod icons;
 mod idle;
 mod notify;
 mod state;

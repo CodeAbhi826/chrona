@@ -15,9 +15,10 @@
 Chrona is a from-scratch, Google-Digital-Wellbeing-style time tracker for the Linux desktop:
 
 - **Today / Week / Month dashboards** — total screen time, day timeline strip, hourly timeline, category donut, per-day stacked bars, month heatmap, week-over-week comparison.
-- **Per-app and per-window detail** — every app gets usage time, session counts and its most-used window titles (documents, sites, projects). PWAs (installed web apps) are tracked as first-class apps.
+- **Per-app and per-window detail** — every app gets usage time, session counts and its most-used window titles (documents, sites, projects). PWAs (installed web apps) are tracked as first-class apps with their own name and icon.
 - **Smart categorisation** — built-in rules map apps to Work / Browsers / Communication / Media / Creative / Games / System, and title rules catch streaming inside browsers (Netflix in Firefox counts as *Media*, not *Browsers*). Your own rules always win.
-- **Daily goals** — an overall **screen-time goal** plus per-app or per-category daily limits; exceeded limits are flagged on the dashboard, and the daemon raises a desktop notification the moment a limit is crossed.
+- **Real app names and icons** — the daemon resolves window ids against freedesktop `.desktop` entries (StartupWMClass, exec name, PWA app-ids), so rows show "LibreOffice Writer" with its real icon, not a machine id. Served to both the native UI and the web demo.
+- **Daily goals** — an overall **screen-time goal** plus per-app or per-category daily limits; exceeded limits are flagged on the dashboard, and the daemon runs an escalating notification sequence: a heads-up at 90 % of a limit, a critical notification the moment it is crossed, and optional reminders every 15 minutes while you stay over it.
 - **AFK-aware** — idle and lock-screen time is detected and subtracted (and shown as *away* time), so "screen time" means *actually at the machine*, with an Android-style **unlocks** counter.
 - **Pause tracking** — one switch (Settings, or the API) suspends recording; paused time is counted as away, never as usage.
 - **Native and lightweight** — a Rust daemon (~10 MB RAM, systemd user service) plus a GPU-accelerated Slint GUI. No Electron, no Chromium, no browser engine — the whole stack idles around ~50 MB.
@@ -182,8 +183,6 @@ bundlable.
 ## Roadmap
 
 - [ ] GNOME Wayland shell extension (window events)
-- [ ] App icons from the system icon theme in the native UI (the web demo
-      already bundles brand icons, see `tools/demo/web/icons/`)
 - [ ] Focus sessions with Do Not Disturb
 - [ ] Optional enforcement: soft blocking when a daily limit is hit
 - [ ] Per-day-of-week limit schedules (weekend vs weekday budgets)

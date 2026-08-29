@@ -18,8 +18,73 @@ use crate::{
 pub static REFRESH: AtomicBool = AtomicBool::new(false);
 
 /// Cached 30-day app list for the Apps view search filter.
-static APPS_CACHE: Mutex<Vec<AppItem>> = Mutex::new(Vec::new());
+///
+/// Plain data (no `slint::Image` — it is not `Send`, so it cannot live in
+/// a static); icons are loaded from `icon_path` when view models are built.
+#[derive(Clone)]
+struct AppSummary {
+    app_id: String,
+    name: String,
+    seconds: i64,
+    seconds_text: String,
+    sessions: i64,
+    share: f32,
+    today_text: String,
+    week_text: String,
+    month_text: String,
+    icon_path: Option<String>,
+}
+
+static APPS_CACHE: Mutex<Vec<AppSummary>> = Mutex::new(Vec::new());
 static THEME_APPLIED: AtomicBool = AtomicBool::new(false);
+
+/// App identity (name/icon/pwa) resolved by the daemon from .desktop
+/// entries. Refreshed every tick for the ids currently displayed.
+pub struct MetaInfo {
+    pub name: String,
+    pub icon: Option<String>,
+    pub pwa: bool,
+}
+static META: Mutex<Vec<(String, MetaInfo)>> = Mutex::new(Vec::new());
+
+fn meta_of(app_id: &str) -> Option<MetaInfo> {
+    META.lock()
+        .unwrap()
+        .iter()
+        .find(|(k, _)| k == app_id)
+        .map(|(_, m)| MetaInfo {
+            name: m.name.clone(),
+            icon: m.icon.clone(),
+            pwa: m.pwa,
+        })
+}
+
+/// Ask the daemon to resolve a batch of app ids against .desktop entries.
+fn fetch_meta(ids: &[String]) -> Vec<(String, MetaInfo)> {
+    let mut out = Vec::new();
+    if let Some(data) = request("apps.meta", json!({ "ids": ids })) {
+        if let Some(obj) = data.as_object() {
+            for (k, v) in obj {
+                out.push((
+                    k.clone(),
+                    MetaInfo {
+                        name: v
+                            .get("name")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .to_string(),
+                        icon: v
+                            .get("icon")
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                        pwa: v.get("pwa").and_then(Value::as_bool).unwrap_or(false),
+                    },
+                ));
+            }
+        }
+    }
+    out
+}
 
 pub fn socket_path() -> PathBuf {
     std::env::var("XDG_RUNTIME_DIR")
@@ -92,6 +157,13 @@ fn sstr(s: impl Into<String>) -> SharedString {
     s.into().into()
 }
 
+/// Load an icon file into a Slint image (empty image on any failure —
+/// the row then falls back to the colored dot).
+fn load_icon(path: Option<&str>) -> slint::Image {
+    path.and_then(|p| slint::Image::load_from_path(std::path::Path::new(p)).ok())
+        .unwrap_or_default()
+}
+
 fn rc<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
     ModelRc::new(VecModel::from(v))
 }
@@ -123,25 +195,50 @@ fn shares(apps: &[Value]) -> Vec<f32> {
 
 // ----- view-model builders ---------------------------------------------------
 
-fn build_apps(payload: &Value) -> Vec<AppItem> {
+fn build_apps(payload: &Value) -> Vec<AppSummary> {
     let apps = arr(payload, "apps");
     let sh = shares(apps);
     apps.iter()
         .zip(sh)
-        .map(|(a, share)| AppItem {
-            app_id: sstr(a.get("app_id").and_then(Value::as_str).unwrap_or("")),
-            name: sstr(pretty_name(
-                a.get("app_id").and_then(Value::as_str).unwrap_or(""),
-            )),
-            seconds: i64_of(a, "seconds") as i32,
-            seconds_text: sstr(fmt_dur(i64_of(a, "seconds"))),
-            sessions: i64_of(a, "sessions") as i32,
-            share,
-            today_text: Default::default(),
-            week_text: Default::default(),
-            month_text: Default::default(),
+        .map(|(a, share)| {
+            let id = a.get("app_id").and_then(Value::as_str).unwrap_or("");
+            let meta = meta_of(id);
+            AppSummary {
+                app_id: id.to_string(),
+                name: meta
+                    .as_ref()
+                    .map(|m| m.name.clone())
+                    .filter(|n| !n.is_empty())
+                    .unwrap_or_else(|| pretty_name(id)),
+                seconds: i64_of(a, "seconds"),
+                seconds_text: fmt_dur(i64_of(a, "seconds")),
+                sessions: i64_of(a, "sessions"),
+                share,
+                today_text: String::new(),
+                week_text: String::new(),
+                month_text: String::new(),
+                icon_path: meta.and_then(|m| m.icon),
+            }
         })
         .collect()
+}
+
+/// AppSummary → the struct the Slint views consume.
+fn to_item(s: &AppSummary) -> AppItem {
+    AppItem {
+        app_id: sstr(s.app_id.clone()),
+        name: sstr(s.name.clone()),
+        seconds: s.seconds as i32,
+        seconds_text: sstr(s.seconds_text.clone()),
+        sessions: s.sessions as i32,
+        share: s.share,
+        today_text: sstr(s.today_text.clone()),
+        week_text: sstr(s.week_text.clone()),
+        month_text: sstr(s.month_text.clone()),
+        icon: load_icon(s.icon_path.as_deref()),
+        has_icon: s.icon_path.is_some(),
+        pwa: false,
+    }
 }
 
 /// SVG arc command on a 100×100 viewbox, radius 45, clockwise from top.
@@ -422,6 +519,21 @@ fn tick(app: &ChronaApp) {
     let week = request("week", json!({}));
     let month = request("month", json!({}));
 
+    // ---- app identity (names/icons from .desktop entries) ----
+    {
+        let mut ids: Vec<String> = Vec::new();
+        for p in [&day, &week, &month].into_iter().flatten() {
+            for a in arr(p, "apps") {
+                if let Some(id) = a.get("app_id").and_then(Value::as_str) {
+                    if !ids.iter().any(|x| x == id) {
+                        ids.push(id.to_string());
+                    }
+                }
+            }
+        }
+        *META.lock().unwrap() = fetch_meta(&ids);
+    }
+
     // ---- today ----
     if let Some(day) = &day {
         let total = i64_of(day, "total_seconds");
@@ -429,7 +541,7 @@ fn tick(app: &ChronaApp) {
         app.set_today_total_text(sstr(fmt_dur(total)));
         app.set_today_unlocks(sstr(i64_of(day, "unlocks").to_string()));
         app.set_today_longest(sstr(fmt_dur(i64_of(day, "longest_session"))));
-        app.set_today_apps(rc(build_apps(day).into_iter().take(6).collect()));
+        app.set_today_apps(rc(build_apps(day).iter().map(to_item).take(6).collect()));
         let cats = arr(day, "categories").to_vec();
         app.set_today_cats(rc(build_cats(&cats, 0)));
         app.set_today_cat_arcs(rc(build_arcs(&cats)));
@@ -468,7 +580,7 @@ fn tick(app: &ChronaApp) {
         } else {
             "first tracked week".to_string()
         }));
-        app.set_week_apps(rc(build_apps(week).into_iter().take(8).collect()));
+        app.set_week_apps(rc(build_apps(week).iter().map(to_item).take(8).collect()));
         let days = arr(week, "days").to_vec();
         let (day_items, _) = build_days(&days);
         app.set_week_days(rc(day_items));
@@ -510,7 +622,7 @@ fn tick(app: &ChronaApp) {
                 .unwrap_or_else(|| "no data yet".into()),
         ));
         app.set_month_weeks(rc(build_heatmap(&days)));
-        app.set_month_apps(rc(build_apps(month).into_iter().take(8).collect()));
+        app.set_month_apps(rc(build_apps(month).iter().map(to_item).take(8).collect()));
     }
 
     // ---- apps (30-day table) + per-range columns ----
@@ -553,15 +665,13 @@ fn tick(app: &ChronaApp) {
             .collect();
         let mut list = build_apps(month);
         for item in list.iter_mut() {
-            let id = item.app_id.to_string();
-            item.today_text = sstr(today_map.get(&id).cloned().unwrap_or_else(|| "—".into()));
-            item.week_text = sstr(week_map.get(&id).cloned().unwrap_or_else(|| "—".into()));
-            item.month_text = sstr(
-                month_map
-                    .get(&id)
-                    .cloned()
-                    .unwrap_or_else(|| fmt_dur(item.seconds as i64)),
-            );
+            let id = item.app_id.clone();
+            item.today_text = today_map.get(&id).cloned().unwrap_or_else(|| "—".into());
+            item.week_text = week_map.get(&id).cloned().unwrap_or_else(|| "—".into());
+            item.month_text = month_map
+                .get(&id)
+                .cloned()
+                .unwrap_or_else(|| fmt_dur(item.seconds));
         }
         list.sort_by_key(|a| std::cmp::Reverse(a.seconds));
         *APPS_CACHE.lock().unwrap() = list.clone();
@@ -667,7 +777,7 @@ pub fn apply_search(app: &ChronaApp, query: &str) {
                 || a.name.to_lowercase().contains(&q)
                 || a.app_id.to_lowercase().contains(&q)
         })
-        .cloned()
+        .map(to_item)
         .collect();
     app.set_apps_list(rc(filtered));
 }
@@ -680,7 +790,12 @@ pub fn load_app_detail(app: &ChronaApp, app_id: &str) {
     let titles = arr(&data, "titles");
     let total: i64 = titles.iter().map(|t| i64_of(t, "seconds")).sum();
     let sessions: i64 = titles.iter().map(|t| i64_of(t, "sessions")).sum();
-    app.set_app_detail_name(sstr(pretty_name(app_id)));
+    app.set_app_detail_name(sstr(
+        meta_of(app_id)
+            .map(|m| m.name)
+            .filter(|n| !n.is_empty())
+            .unwrap_or_else(|| pretty_name(app_id)),
+    ));
     app.set_app_detail_total(sstr(fmt_dur(total)));
     app.set_app_detail_sessions(sstr(sessions.to_string()));
     app.set_app_titles(rc(titles

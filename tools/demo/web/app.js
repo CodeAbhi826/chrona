@@ -61,7 +61,7 @@ const hhmm = (ts) => new Date(ts * 1000).toLocaleTimeString("en-GB", { hour: "2-
 
 function goalLabel(g) {
   return g.kind === "total" ? "Screen time"
-    : g.kind === "category" ? chronaLabel(g.key) : prettyName(g.key);
+    : g.kind === "category" ? chronaLabel(g.key) : displayName(g.key);
 }
 
 function goalIcon(g) {
@@ -93,7 +93,32 @@ const PWA_ICONS = {
   "youtube music": "youtubemusic.svg", notion: "notion.svg", figma: "figma.svg",
 };
 
+// Daemon-resolved identity (.desktop entries): {app_id: {name, icon, pwa}}.
+// Preferred source for names/icons of apps actually installed on this
+// machine; unknown ids are cached as null so we ask only once.
+const metaCache = {};
+
+async function refreshMeta(ids) {
+  const want = ids.filter((id) => !(id in metaCache));
+  if (!want.length) return;
+  try {
+    const j = await apiPost("apps.meta", { ids: want });
+    const data = j && j.ok ? j.data : null;
+    for (const id of want) metaCache[id] = data ? data[id] || null : null;
+  } catch { /* daemon offline — bundled fallbacks still work */ }
+}
+
+function displayName(appId) {
+  const m = metaCache[appId];
+  return m && m.name ? m.name : prettyName(appId);
+}
+
 function renderAppIcon(appId) {
+  const m = metaCache[appId];
+  if (m && m.icon) {
+    const badge = m.pwa ? ` <span class="pwa-badge">PWA</span>` : "";
+    return `<span class="ic icon"><img class="appicon" src="/sysicon?p=${encodeURIComponent(m.icon)}" alt="" draggable="false">${badge}</span>`;
+  }
   const file = APP_ICONS[appId];
   if (file) {
     const inv = ICON_INVERT_DARK.has(file) ? " inv" : "";
@@ -201,7 +226,7 @@ function appRowHTML(a, share, timeText, open) {
   return `<div class="appitem" data-app="${esc(a.app_id)}">
     <div class="approw ${open ? "open" : ""}">
       ${renderAppIcon(a.app_id)}
-      <span class="name" title="${esc(a.app_id)}">${esc(prettyName(a.app_id))}</span>
+      <span class="name" title="${esc(a.app_id)}">${esc(displayName(a.app_id))}</span>
       <span class="bar"><i style="width:${(Math.min(1, Math.max(0, share)) * 100).toFixed(1)}%"></i></span>
       <span class="time">${esc(timeText)}</span>
       <span class="chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span>
@@ -260,7 +285,7 @@ function renderStrip(d) {
     const w = Math.max(0.18, ((s.end - s.start) / span) * 100);
     const app = s.app_id || "?";
     return `<i style="left:${l.toFixed(2)}%;width:${w.toFixed(2)}%;background:${appColor(app)}"
-      title="${hhmm(s.start)} – ${hhmm(s.end)} · ${esc(prettyName(app))} · ${fmtDur(s.end - s.start)}"></i>`;
+      title="${hhmm(s.start)} – ${hhmm(s.end)} · ${esc(displayName(app))} · ${fmtDur(s.end - s.start)}"></i>`;
   }).join("");
 }
 
@@ -348,11 +373,11 @@ async function renderNowLine() {
   let line = "";
   if (state.status && state.status.current_window) {
     const cw = state.status.current_window;
-    line = `Right now: ${prettyName(cw.app_id || "")} — ${cw.title || ""}`;
+    line = `Right now: ${displayName(cw.app_id || "")} — ${cw.title || ""}`;
   } else {
     const d = await api("settings.get", { key: "demo.current_window" });
     const v = d && d.value;
-    if (v) line = v.startsWith("AFK") ? "Right now: AFK" : `Right now: ${prettyName(v.split(" — ")[0])} — ${v.split(" — ").slice(1).join(" — ")}`;
+    if (v) line = v.startsWith("AFK") ? "Right now: AFK" : `Right now: ${displayName(v.split(" — ")[0])} — ${v.split(" — ").slice(1).join(" — ")}`;
   }
   $("nowLine").textContent = line;
 }
@@ -407,7 +432,7 @@ function renderStats() {
     const lbl = new Date(busiest.date + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long" });
     ins.push(`<b>${lbl}</b> was your heaviest day at <b>${fmtDur(busiest.seconds)}</b>.`);
   }
-  if (topApp) ins.push(`<b>${esc(prettyName(topApp.app_id))}</b> leads the week with <b>${fmtDur(topApp.seconds)}</b>.`);
+  if (topApp) ins.push(`<b>${esc(displayName(topApp.app_id))}</b> leads the week with <b>${fmtDur(topApp.seconds)}</b>.`);
   if (cats[0]) ins.push(`<b>${esc(cats[0].label)}</b> took <b>${Math.round((cats[0].seconds / totalC) * 100)}%</b> of your screen time.`);
   if (prev > 0) ins.push(delta > 0
     ? `Up <b>${fmtDur(delta)}</b> vs last week.`
@@ -465,7 +490,7 @@ function renderStats() {
   const mx = merged.reduce((mm, a) => Math.max(mm, a.seconds), 0);
   $("statApps").innerHTML = merged.map((a) => `<div class="approw" style="cursor:default">
       ${renderAppIcon(a.app_id)}
-      <span class="name" title="${esc(a.app_id)}">${esc(prettyName(a.app_id))}</span>
+      <span class="name" title="${esc(a.app_id)}">${esc(displayName(a.app_id))}</span>
       <span class="bar"><i style="width:${(mx > 0 ? a.seconds / mx : 0) * 100}%"></i></span>
       <span class="time">${wk.get(a.app_id) || "—"} · ${mo.get(a.app_id) || "—"}</span>
     </div>`).join("");
@@ -502,6 +527,16 @@ async function tick() {
   if (day) state.day = day;
   if (week) state.week = week;
   if (month) state.month = month;
+
+  // Resolve app identities (real names/icons via .desktop) before renders.
+  {
+    const ids = new Set();
+    for (const r of [state.day, state.week, state.month]) {
+      for (const a of arr(r, "apps")) ids.add(String(a.app_id || ""));
+    }
+    for (const g of state.goals) if (g.kind === "app") ids.add(String(g.key || ""));
+    await refreshMeta([...ids].filter(Boolean));
+  }
 
   if (state.page === "today") { renderToday(); renderNowLine(); }
   else if (state.page === "stats") renderStats();

@@ -49,6 +49,7 @@ TITLES = {
         "git — rebase -i main",
     ],
     "kate": ["chrona-kwin.js — Kate", "PKGBUILD — Kate", "todo.md — Kate"],
+    "libreoffice-writer": ["quarterly-report.odt — LibreOffice Writer", "chrona-notes.odt — LibreOffice Writer"],
     "dolphin": ["Home — Dolphin", "projects — Dolphin"],
     "discord": ["#chrona-dev — Discord", "Linux Memes — Discord", "KDE Plasma — Discord"],
     "telegram-desktop": ["Arch Linux Group", "KDE Updates", "Rust Community"],
