@@ -79,8 +79,8 @@ impl AppIndex {
                 dirs.push(d);
             }
         }
-        let data_dirs = std::env::var("XDG_DATA_DIRS")
-            .unwrap_or_else(|_| "/usr/local/share:/usr/share".into());
+        let data_dirs =
+            std::env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".into());
         for p in std::env::split_paths(&data_dirs) {
             let d = p.join("applications");
             if !dirs.contains(&d) {
@@ -116,10 +116,7 @@ impl AppIndex {
     /// Scan explicit directories (also the unit-test entry point).
     fn scan_dirs(&mut self, dirs: &[PathBuf]) {
         self.scanned_at = SystemTime::now();
-        self.dir_mtimes = dirs
-            .iter()
-            .map(|d| (d.clone(), dir_mtime(d)))
-            .collect();
+        self.dir_mtimes = dirs.iter().map(|d| (d.clone(), dir_mtime(d))).collect();
         self.by_key.clear();
         for dir in dirs {
             let Ok(files) = std::fs::read_dir(dir) else {
@@ -219,21 +216,22 @@ impl AppIndex {
     /// ("firefox:netflix" from demo seed data) by trying the host part.
     pub fn lookup(&self, app_id: &str) -> Option<AppMeta> {
         let key = app_id.trim().to_lowercase();
-        let try_keys = |k: &str| self.by_key.get(k).map(|e| AppMeta {
-            name: e.name.clone(),
-            icon: self.resolve_icon(&e.icon_raw),
-            pwa: e.pwa,
-        });
-        try_keys(&key)
-            .or_else(|| {
-                // Reverse-DNS tail: "org.telegram.desktop" → "telegram"?
-                // Only for ids with >= 3 dots, never the literal "desktop".
-                if key.matches('.').count() >= 3 {
-                    key.rsplit('.').next().and_then(try_keys)
-                } else {
-                    None
-                }
+        let try_keys = |k: &str| {
+            self.by_key.get(k).map(|e| AppMeta {
+                name: e.name.clone(),
+                icon: self.resolve_icon(&e.icon_raw),
+                pwa: e.pwa,
             })
+        };
+        try_keys(&key).or_else(|| {
+            // Reverse-DNS tail: "org.telegram.desktop" → "telegram"?
+            // Only for ids with >= 3 dots, never the literal "desktop".
+            if key.matches('.').count() >= 3 {
+                key.rsplit('.').next().and_then(try_keys)
+            } else {
+                None
+            }
+        })
     }
 
     /// Resolve an `Icon=` value to an absolute file path. Values may be
@@ -275,7 +273,11 @@ impl AppIndex {
             for root in &self.icon_roots {
                 for size in PREFERRED_SIZES {
                     for ext in ICON_EXTS {
-                        let cand = root.join(theme).join(size).join("apps").join(format!("{raw}.{ext}"));
+                        let cand = root
+                            .join(theme)
+                            .join(size)
+                            .join("apps")
+                            .join(format!("{raw}.{ext}"));
                         if cand.is_file() {
                             return Some(cand);
                         }
@@ -284,11 +286,7 @@ impl AppIndex {
             }
         }
         // Legacy location: /usr/share/pixmaps/<name>.<ext>
-        if let Some(root) = self
-            .icon_roots
-            .iter()
-            .find(|r| r.ends_with("pixmaps"))
-        {
+        if let Some(root) = self.icon_roots.iter().find(|r| r.ends_with("pixmaps")) {
             for ext in ICON_EXTS {
                 let cand = root.join(format!("{raw}.{ext}"));
                 if cand.is_file() {
@@ -302,10 +300,7 @@ impl AppIndex {
     /// Re-scan when a directory changed or the cache is older than ten
     /// minutes. Cheap when nothing changed (a handful of stat calls).
     pub fn refresh_if_stale(&mut self) {
-        let stale = self
-            .dir_mtimes
-            .iter()
-            .any(|(d, m)| dir_mtime(d) != *m)
+        let stale = self.dir_mtimes.iter().any(|(d, m)| dir_mtime(d) != *m)
             || self
                 .scanned_at
                 .elapsed()
@@ -371,7 +366,8 @@ mod tests {
     use super::*;
 
     fn fixture(tag: &str) -> (PathBuf, PathBuf, PathBuf) {
-        let base = std::env::temp_dir().join(format!("chrona-icons-test-{tag}-{}", std::process::id()));
+        let base =
+            std::env::temp_dir().join(format!("chrona-icons-test-{tag}-{}", std::process::id()));
         let apps = base.join("applications");
         let icons = base.join("icons/hicolor/48x48/apps");
         std::fs::create_dir_all(&apps).unwrap();
@@ -384,8 +380,10 @@ mod tests {
     }
 
     fn build(dirs: &[PathBuf], icon_roots: Vec<PathBuf>) -> AppIndex {
-        let mut idx = AppIndex::default();
-        idx.icon_roots = icon_roots;
+        let mut idx = AppIndex {
+            icon_roots,
+            ..Default::default()
+        };
         idx.scan_dirs(dirs);
         idx
     }
@@ -398,7 +396,10 @@ mod tests {
             "[Desktop Entry]\nType=Application\nName=Zap Editor\nExec=zap %F\nIcon=zap\nStartupWMClass=org.example.Zap\n",
         );
         write(&icons.join("zap.svg"), "<svg/>");
-        let idx = build(&[apps.clone()], vec![base.join("icons"), base.join("pixmaps")]);
+        let idx = build(
+            std::slice::from_ref(&apps),
+            vec![base.join("icons"), base.join("pixmaps")],
+        );
         let m = idx.lookup("org.example.zap").expect("wmclass key");
         assert_eq!(m.name, "Zap Editor");
         assert!(m.icon.unwrap().ends_with("zap.svg"));
@@ -415,7 +416,7 @@ mod tests {
             "[Desktop Entry]\nType=Application\nName=YouTube Music\nExec=/usr/bin/brave --app-id=abc123def456\nIcon=chrome-abc123def456-Default\nStartupWMClass=crx_abc123def456\n",
         );
         write(&icons.join("chrome-abc123def456-Default.png"), "png");
-        let idx = build(&[apps.clone()], vec![_base.join("icons")]);
+        let idx = build(std::slice::from_ref(&apps), vec![_base.join("icons")]);
         let m = idx.lookup("crx_abc123def456").expect("crx_ wmclass");
         assert_eq!(m.name, "YouTube Music");
         assert!(m.pwa);
@@ -433,7 +434,7 @@ mod tests {
             "[Desktop Entry]\nType=Application\nName=Vim\nExec=vim %F\nIcon=gvim\n",
         );
         write(&icons.join("gvim.png"), "png");
-        let idx = build(&[apps.clone()], vec![_base.join("icons")]);
+        let idx = build(std::slice::from_ref(&apps), vec![_base.join("icons")]);
         let m = idx.lookup("vim").expect("stem key");
         assert_eq!(m.name, "Vim");
         assert!(m.icon.unwrap().ends_with("gvim.png"));
@@ -446,10 +447,16 @@ mod tests {
             &apps.join("x.desktop"),
             "[Desktop Entry]\nType=Application\nName=Good\nExec=good\nIcon=good\n\n[Desktop Action New]\nName=New Window\nExec=good --new\n",
         );
-        write(&apps.join("link.desktop"), "[Desktop Entry]\nType=Link\nName=Bad\nURL=https://x\n");
-        let idx = build(&[apps.clone()], vec![]);
+        write(
+            &apps.join("link.desktop"),
+            "[Desktop Entry]\nType=Link\nName=Bad\nURL=https://x\n",
+        );
+        let idx = build(std::slice::from_ref(&apps), vec![]);
         assert!(idx.lookup("good").is_some());
-        assert!(idx.lookup("new window").is_none(), "action group keys ignored");
+        assert!(
+            idx.lookup("new window").is_none(),
+            "action group keys ignored"
+        );
         assert!(idx.lookup("bad").is_none(), "Type=Link skipped");
     }
 }

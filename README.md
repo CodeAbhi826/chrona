@@ -19,7 +19,7 @@ a Material You dashboard on top of a tiny Rust daemon.
 
 [Features](#features) · [Screenshots](#screenshots) · [Install](#install) · [Compositor support](#compositor-support) · [Comparison](#how-chrona-compares) · [Scripting](#scripting-the-daemon) · [Roadmap](#roadmap) · [FAQ](#faq)
 
-<img src="docs/screenshots/today.png" width="880" alt="Chrona — Today dashboard with screen-time ring, hourly timeline, and per-app list with real icons" />
+<img src="docs/screenshots/today-dark.png" width="880" alt="Chrona — Today dashboard in dark theme, with screen-time ring, hourly timeline, and per-app list with real icons" />
 
 </div>
 
@@ -52,26 +52,26 @@ Captured from the live demo harness ([`tools/demo`](tools/demo/README.md)) —
 the real daemon and rules engine, a simulated window-event feed, real icons
 resolved from `.desktop` files:
 
-| Today — dashboards, goals, real icons | Today — expandable per-window titles |
+| Today — dark theme, dashboards, goals, real icons | Today — expandable per-window titles |
 |---|---|
-| <img src="docs/screenshots/today.png" width="430" alt="Today view" /> | <img src="docs/screenshots/today-windows.png" width="430" alt="Per-window titles" /> |
+| <img src="docs/screenshots/today-dark.png" width="430" alt="Today view, dark theme" /> | <img src="docs/screenshots/today-windows.png" width="430" alt="Per-window titles" /> |
 
 | Stats — week bars, heatmap, insights | Timers — daily limits per app / category |
 |---|---|
-| <img src="docs/screenshots/stats.png" width="430" alt="Stats view" /> | <img src="docs/screenshots/timers.png" width="430" alt="Timers view" /> |
+| <img src="docs/screenshots/stats-dark.png" width="430" alt="Stats view, dark theme" /> | <img src="docs/screenshots/timers.png" width="430" alt="Timers view" /> |
 
-| Bedtime — schedule + greyscale preview | Today — dark theme |
+| Bedtime — schedule + greyscale preview | Today — light theme |
 |---|---|
-| <img src="docs/screenshots/bedtime.png" width="430" alt="Bedtime view" /> | <img src="docs/screenshots/today-dark.png" width="430" alt="Today, dark theme" /> |
+| <img src="docs/screenshots/bedtime.png" width="430" alt="Bedtime view" /> | <img src="docs/screenshots/today.png" width="430" alt="Today view, light theme" /> |
 
 <details>
-<summary><b>More screenshots</b> — Focus timer, Settings, Stats in dark</summary>
+<summary><b>More screenshots</b> — Focus timer, Settings, Stats in light theme</summary>
 
 | Focus — session timer | Settings |
 |---|---|
 | <img src="docs/screenshots/focus.png" width="430" alt="Focus view" /> | <img src="docs/screenshots/settings.png" width="430" alt="Settings view" /> |
 
-<img src="docs/screenshots/stats-dark.png" width="620" alt="Stats, dark theme" />
+<img src="docs/screenshots/stats.png" width="620" alt="Stats, light theme" />
 
 </details>
 
@@ -90,6 +90,20 @@ cargo build --release -p chronad -p chrona
 install -Dm755 target/release/{chronad,chrona} -t ~/.local/bin/
 install -Dm644 packaging/chrona.service ~/.config/systemd/user/
 ```
+
+To also get a proper launcher entry (app menu / overview search showing
+*Chrona* with its clock icon instead of a bare binary), install the shipped
+`.desktop` file and the hicolor icons it references — the same files the
+packages install, just into your user directories:
+
+```bash
+install -Dm644 packaging/chrona.desktop ~/.local/share/applications/
+install -Dm644 assets/icon.svg ~/.local/share/icons/hicolor/scalable/apps/chrona.svg
+install -Dm644 assets/icon-256.png ~/.local/share/icons/hicolor/256x256/apps/chrona.png
+```
+
+Log out and back in (or run `update-desktop-database ~/.local/share/applications`)
+if your launcher does not pick the entry up immediately.
 
 ### Arch Linux
 

@@ -73,10 +73,7 @@ fn fetch_meta(ids: &[String]) -> Vec<(String, MetaInfo)> {
                             .and_then(Value::as_str)
                             .unwrap_or("")
                             .to_string(),
-                        icon: v
-                            .get("icon")
-                            .and_then(Value::as_str)
-                            .map(str::to_string),
+                        icon: v.get("icon").and_then(Value::as_str).map(str::to_string),
                         pwa: v.get("pwa").and_then(Value::as_bool).unwrap_or(false),
                     },
                 ));
