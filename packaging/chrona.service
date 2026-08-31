@@ -1,6 +1,6 @@
 [Unit]
 Description=Chrona - digital wellbeing daemon
-Documentation=https://github.com/chrona-linux/chrona
+Documentation=https://github.com/CodeAbhi826/chrona
 PartOf=graphical-session.target
 After=graphical-session.target
 

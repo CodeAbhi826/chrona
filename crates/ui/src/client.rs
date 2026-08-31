@@ -1,19 +1,18 @@
 //! Daemon client + view-model building for the Chrona UI.
 
+use crate::{
+    AppItem, ArcItem, CatItem, ChronaApp, DayItem, GoalItem, HeatCell, HourItem, Theme, TitleItem,
+    WeekColumn,
+};
 use chrono::Datelike;
 use serde_json::{json, Value};
-use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel, Weak};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
-
-use crate::{
-    AppItem, ArcItem, CatItem, ChronaApp, DayItem, GoalItem, HeatCell, HourItem, Theme, TitleItem,
-    WeekColumn,
-};
 
 pub static REFRESH: AtomicBool = AtomicBool::new(false);
 
@@ -444,22 +443,15 @@ fn build_heatmap(days: &[Value]) -> Vec<WeekColumn> {
 }
 
 // ----- the polling tick --------------------------------------------------------
+//
+// v0.2.0 ran this from a `std::thread` and called `weak.upgrade()` there.
+// slint::Weak::upgrade() only works on the thread that created the component
+// (returns None elsewhere), so the UI never saw the daemon and showed
+// "Chrona daemon is not running" even with a healthy chronad. Polling now
+// happens from two slint::Timer callbacks, which run on the event-loop thread
+// where the upgrade is valid.
 
-pub fn poll_loop(weak: Weak<ChronaApp>) {
-    loop {
-        if let Some(app) = weak.upgrade() {
-            tick(&app);
-        }
-        for _ in 0..50 {
-            if REFRESH.swap(false, Ordering::SeqCst) {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        }
-    }
-}
-
-fn tick(app: &ChronaApp) {
+pub fn tick(app: &ChronaApp) {
     let status = match request("status", json!({})) {
         Some(s) => s,
         None => {

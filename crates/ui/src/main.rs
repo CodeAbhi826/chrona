@@ -69,8 +69,42 @@ fn main() -> Result<(), slint::PlatformError> {
     let app = ChronaApp::new()?;
     app.set_font_family(family.into());
 
-    let weak = app.as_weak();
-    std::thread::spawn(move || client::poll_loop(weak));
+    // ---- daemon polling ------------------------------------------------------
+    // v0.2.0 spawned a std::thread that called `weak.upgrade()` off-thread;
+    // slint::Weak::upgrade() returns None from any other thread, so the UI
+    // never saw the daemon and showed "not running" forever. Timers run their
+    // callbacks on the event-loop thread, where the upgrade is valid.
+    let slow_timer = slint::Timer::default();
+    {
+        let weak = app.as_weak();
+        slow_timer.start(
+            slint::TimerMode::Repeated,
+            std::time::Duration::from_secs(5),
+            move || {
+                if let Some(app) = weak.upgrade() {
+                    client::tick(&app);
+                }
+            },
+        );
+    }
+    // Buttons (add/remove goal, theme…) set REFRESH to ask for an early tick;
+    // this timer honours that within 250 ms instead of waiting for the 5 s one.
+    let fast_timer = slint::Timer::default();
+    {
+        let weak = app.as_weak();
+        fast_timer.start(
+            slint::TimerMode::Repeated,
+            std::time::Duration::from_millis(250),
+            move || {
+                if REFRESH.swap(false, Ordering::SeqCst) {
+                    if let Some(app) = weak.upgrade() {
+                        client::tick(&app);
+                    }
+                }
+            },
+        );
+    }
+    client::tick(&app); // first tick on the main thread, before the loop starts
 
     // ---- theme ----
     {

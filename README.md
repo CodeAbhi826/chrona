@@ -11,7 +11,7 @@ a Material You dashboard on top of a tiny Rust daemon.
 **Zero network access. Ever.**
 
 [![CI](https://github.com/CodeAbhi826/chrona/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeAbhi826/chrona/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v0.2.0-0B57D0)](https://github.com/CodeAbhi826/chrona/releases)
+[![Release](https://img.shields.io/badge/release-v0.2.1-0B57D0)](https://github.com/CodeAbhi826/chrona/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux-1793D1?logo=linux&logoColor=white)](#compositor-support)
 [![Network](https://img.shields.io/badge/network-none-success)](#does-chrona-ever-touch-the-network)

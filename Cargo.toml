@@ -3,11 +3,11 @@ resolver = "2"
 members = ["crates/core", "crates/store", "crates/daemon", "crates/ui"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/chrona-linux/chrona"
-homepage = "https://github.com/chrona-linux/chrona"
+repository = "https://github.com/CodeAbhi826/chrona"
+homepage = "https://github.com/CodeAbhi826/chrona"
 readme = "README.md"
 
 [workspace.dependencies]
