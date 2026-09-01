@@ -11,7 +11,7 @@ a Material You dashboard on top of a tiny Rust daemon.
 **Zero network access. Ever.**
 
 [![CI](https://github.com/CodeAbhi826/chrona/actions/workflows/ci.yml/badge.svg)](https://github.com/CodeAbhi826/chrona/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v0.2.1-0B57D0)](https://github.com/CodeAbhi826/chrona/releases)
+[![Release](https://img.shields.io/badge/release-v0.2.2-0B57D0)](https://github.com/CodeAbhi826/chrona/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux-1793D1?logo=linux&logoColor=white)](#compositor-support)
 [![Network](https://img.shields.io/badge/network-none-success)](#does-chrona-ever-touch-the-network)
@@ -76,6 +76,37 @@ resolved from `.desktop` files:
 </details>
 
 ## Install
+
+### One command (Arch, Debian, Ubuntu, Fedora, RHEL/Rocky/Alma, openSUSE, Void — and anything glibc/x86_64)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CodeAbhi826/chrona/main/install.sh | bash
+```
+
+The installer auto-detects everything: distro and package manager (pacman /
+apt / dnf / zypper / xbps), privileges (sudo, or a no-root `--user` mode),
+downloader (curl/wget/gh), desktop environment and session type. It installs
+the binaries from the latest GitHub release, the systemd user unit (XDG
+autostart fallback where there is no systemd), the app-menu entry with icons,
+and on KDE Plasma the KWin watcher script — then verifies the daemon and runs
+an end-to-end window-event test. From a checkout, `bash install.sh` does the
+same using the local packaging files.
+
+| | Supported |
+|---|---|
+| **Distros** | Arch / Manjaro / EndeavourOS · Debian / Ubuntu / Mint / Pop!_OS · Fedora / RHEL / Rocky / Alma · openSUSE · Void · any other glibc x86_64 Linux |
+| **Shells** | bash, zsh, fish, anything — system installs need zero shell config (`--user` mode edits the login shell's rc file) |
+| **Privileges** | root/sudo/doas, or fully rootless with `--user` |
+
+<details><summary>Pinned / offline / no-root variants</summary>
+
+```bash
+bash install.sh v0.2.2     # pin a version
+bash install.sh --user     # install into ~/.local (no root at all)
+```
+
+Alpine (musl) and non-x86_64 are build-from-source for now — see below.
+</details>
 
 ### From source (any distro)
 

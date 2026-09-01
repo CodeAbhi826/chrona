@@ -1,6 +1,6 @@
 # Maintainer: Chrona contributors <noreply@chrona.invalid>
 pkgname=chrona
-pkgver=0.2.0
+pkgver=0.2.2
 pkgrel=1
 pkgdesc="Digital wellbeing for every Linux desktop - screen time, per-app stats and daily goals (KDE Wayland, wlroots, X11). 100% local."
 arch=(x86_64 aarch64)

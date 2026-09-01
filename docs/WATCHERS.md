@@ -31,8 +31,14 @@ script that reports window activations over the session bus.
 **Install (either):**
 
 - Chrona → Settings → *Install / update KWin watcher*, or
-- `./kwin/install.sh` from a checkout, or
+- `./kwin/install.sh` from a checkout (or `bash install.sh` from the repo
+  root — the universal installer runs it on KDE), or
 - the package already placed it at `/usr/share/chrona/kwin/chrona-watcher`.
+
+The tooling always points kpackagetool at the package **source** (checkout or
+`/usr/share` copy), never at the installed copy in `~/.local/share/kwin/scripts`
+— `--upgrade` deletes the installed package first, so upgrading "from" it
+would fail with `No such file`.
 
 **Verify:**
 
