@@ -232,9 +232,15 @@ fn main() -> Result<(), slint::PlatformError> {
     app.run()
 }
 
-/// Copy the KWin watcher script into ~/.local/share/kwin/scripts and enable
-/// it. Tries, in order: packaged script at /usr/share/chrona, the repo
+/// Register + enable the KWin watcher script for the current user.
+/// Tries, in order: packaged script at /usr/share/chrona, the repo
 /// checkout (cargo run), then gives up with a helpful message.
+///
+/// kpackagetool is pointed at the package SOURCE, never at the installed
+/// copy — `--upgrade` uninstalls (deletes) the installed package first, so
+/// upgrading "from" the install location fails with "No such file". No
+/// manual copy is done at all: kpackagetool installs into
+/// ~/.local/share/kwin/scripts by itself.
 fn install_kwin_script() -> String {
     let candidates = [
         std::path::PathBuf::from("/usr/share/chrona/kwin/chrona-watcher"),
@@ -246,43 +252,43 @@ fn install_kwin_script() -> String {
     let Some(src) = candidates.iter().find(|p| p.exists()) else {
         return "KWin script not found — install the chrona package or run from the repo".into();
     };
+    let src = src.display().to_string();
 
-    let home = std::env::var("HOME").unwrap_or_default();
-    let dst = format!("{home}/.local/share/kwin/scripts/chrona-watcher");
-    let copy = std::process::Command::new("cp")
-        .arg("-rL")
-        .arg(src)
-        .arg(&dst)
-        .output();
-    match copy {
-        Ok(o) if o.status.success() => {}
-        Ok(o) => return format!("copy failed: {}", String::from_utf8_lossy(&o.stderr)),
-        Err(e) => return format!("copy failed: {e}"),
-    }
+    let pick = |names: &[&str]| {
+        names
+            .iter()
+            .find(|n| {
+                std::process::Command::new(n)
+                    .arg("--version")
+                    .output()
+                    .is_ok()
+            })
+            .map(|s| s.to_string())
+    };
+    let Some(kpt) = pick(&["kpackagetool6", "kpackagetool5"]) else {
+        return "kpackagetool not found — install Plasma's kpackage tools".into();
+    };
+    let kwc = pick(&["kwriteconfig6", "kwriteconfig5"]).unwrap_or_else(|| "kwriteconfig6".into());
 
-    let steps: [(&str, String); 4] = [
-        (
-            "install",
-            format!("kpackagetool6 --type=KWin/Script -u {dst} 2>/dev/null || kpackagetool6 --type=KWin/Script -i {dst}"),
-        ),
-        (
-            "enable",
-            "kwriteconfig6 --file kwinrc --group Plugins --key chrona-watcherEnabled true".to_string(),
-        ),
-        (
-            "start",
-            "dbus-send --session --dest=org.kde.KWin /Scripting org.kde.kwin.Scripting.start".to_string(),
-        ),
-        ("reload", "dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure".to_string()),
-    ];
-    let mut report = String::new();
-    for (name, cmd) in steps {
-        match run_sh(&cmd) {
-            Ok(_) => report.push_str(&format!("{name} ✓ ")),
-            Err(e) => report.push_str(&format!("{name}: {e}; ")),
-        }
+    // Install or upgrade from the SOURCE dir; enable in kwinrc ([Plugins]
+    // per the KDE docs, plus [Scripts] for older Plasma 5 layouts); load now.
+    let script = format!(
+        "set -e\n\
+         if {kpt} --type=KWin/Script --list 2>/dev/null | grep -q chrona-watcher; then\n\
+         \x20\x20\x20{kpt} --type=KWin/Script -u \"{src}\"\n\
+         else\n\
+         \x20\x20\x20{kpt} --type=KWin/Script -i \"{src}\"\n\
+         fi\n\
+         {kwc} --file kwinrc --group Plugins --key chrona-watcherEnabled true || true\n\
+         {kwc} --file kwinrc --group Scripts --key chrona-watcherEnabled true || true\n\
+         dbus-send --session --dest=org.kde.KWin /Scripting org.kde.kwin.Scripting.start >/dev/null 2>&1 || true\n\
+         dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true"
+    );
+    match run_sh(&script) {
+        Ok(_) => "installed and enabled. If it does not activate immediately, log out and back in."
+            .into(),
+        Err(e) => format!("kpackagetool failed: {e}"),
     }
-    format!("installed. {report}If it does not activate immediately, log out and back in.")
 }
 
 fn run_sh(cmd: &str) -> Result<(), String> {
