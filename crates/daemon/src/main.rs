@@ -165,10 +165,12 @@ fn main() -> anyhow::Result<()> {
 
     // The state machine uses its own connection to the same SQLite file
     // (WAL handles concurrent readers/writers). The pause switch is shared
-    // with the API so `pause.set` takes effect within a second.
+    // with the API so `pause.set` takes effect within a second. The tracker
+    // is the one inside `Shared` as well, so `status` reports the live
+    // current window/AFK state instead of a stale copy.
     let tracker_store = Store::open(shared.store.path())?;
     let paused = Arc::clone(&shared.paused);
-    state::run(state::Tracker::new(), tracker_store, rx, &SHUTDOWN, paused);
+    state::run(&shared.tracker, tracker_store, rx, &SHUTDOWN, paused);
 
     let _ = std::fs::remove_file(&socket_path);
     eprintln!("[chronad] stopped cleanly");

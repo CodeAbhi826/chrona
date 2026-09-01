@@ -4,6 +4,7 @@
 use chrona_core::model::{AfkSession, WindowEvent};
 use chrona_store::Store;
 use std::sync::mpsc::Receiver;
+use std::sync::Mutex;
 use std::time::Duration;
 
 pub enum Event {
@@ -157,8 +158,13 @@ impl Tracker {
 
 /// Main state loop. Checks the shutdown flag and the pause switch at least
 /// once per second.
+///
+/// The tracker is the *shared* one (behind `api::Shared`'s mutex), so `status`
+/// and the live UI always see the real current window instead of a stale
+/// copy. Events arrive at human speed and `handle` writes at most one small
+/// SQLite row, so holding the lock per event is cheap.
 pub fn run(
-    mut tracker: Tracker,
+    tracker: &Mutex<Tracker>,
     store: Store,
     rx: Receiver<Event>,
     shutdown: &'static std::sync::atomic::AtomicBool,
@@ -168,26 +174,35 @@ pub fn run(
     // Apply a persisted pause from a previous run on startup.
     let mut last_paused = paused.load(Ordering::Relaxed);
     if last_paused {
-        tracker.handle(Event::SetPaused(true), &store, now());
+        tracker
+            .lock()
+            .unwrap()
+            .handle(Event::SetPaused(true), &store, now());
     }
     loop {
         let p = paused.load(Ordering::Relaxed);
         if p != last_paused {
-            tracker.handle(Event::SetPaused(p), &store, now());
+            tracker
+                .lock()
+                .unwrap()
+                .handle(Event::SetPaused(p), &store, now());
             last_paused = p;
         }
         let ev = match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(ev) => ev,
             Err(_) => {
                 if shutdown.load(Ordering::SeqCst) {
-                    tracker.handle(Event::Shutdown, &store, now());
+                    tracker
+                        .lock()
+                        .unwrap()
+                        .handle(Event::Shutdown, &store, now());
                     return;
                 }
                 continue;
             }
         };
         let stop = matches!(ev, Event::Shutdown);
-        tracker.handle(ev, &store, now());
+        tracker.lock().unwrap().handle(ev, &store, now());
         if stop {
             return;
         }
@@ -323,8 +338,9 @@ mod tests {
         let s2 = Store::open(store.path()).unwrap();
         let paused: std::sync::Arc<std::sync::atomic::AtomicBool> =
             std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let tracker = std::sync::Mutex::new(Tracker::new());
         let handle = std::thread::spawn(move || {
-            run(Tracker::new(), s2, rx, &SHUTDOWN, paused);
+            run(&tracker, s2, rx, &SHUTDOWN, paused);
         });
         tx.send(Event::Window {
             app: "x".into(),
