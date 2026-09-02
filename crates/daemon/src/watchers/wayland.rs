@@ -40,6 +40,10 @@ pub struct App {
     seat: Option<wl_seat::WlSeat>,
     idle_created: bool,
     toplevels: HashMap<ObjectId, ToplevelInfo>,
+    /// The currently activated toplevel, if any. Title/app-id updates for
+    /// THIS handle are re-reported (a toplevel can activate before its
+    /// app-id/title arrive — the first event would otherwise be empty).
+    activated: Option<ObjectId>,
 }
 
 impl App {
@@ -50,6 +54,21 @@ impl App {
         if let (Some(notifier), Some(seat)) = (&self.notifier, &self.seat) {
             self.idle_created = true;
             let _ = notifier.get_idle_notification(60_000, seat, qh, ());
+        }
+    }
+
+    /// Report the activated toplevel as a window event — but only once it
+    /// is identifiable (empty app-ids would poison the event stream).
+    fn report_activated(&self) {
+        let Some(id) = &self.activated else { return };
+        let Some(t) = self.toplevels.get(id) else {
+            return;
+        };
+        if !t.app_id.is_empty() {
+            let _ = self.tx.send(Event::Window {
+                app: t.app_id.clone(),
+                title: t.title.clone(),
+            });
         }
     }
 }
@@ -125,29 +144,40 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for App {
         _qh: &QueueHandle<Self>,
     ) {
         let id = handle.id();
+        let is_activated = state.activated.as_ref() == Some(&id);
         match event {
             zwlr_foreign_toplevel_handle_v1::Event::Title { title } => {
                 if let Some(t) = state.toplevels.get_mut(&id) {
                     t.title = title;
+                }
+                // The activated toplevel changed its title (e.g. a browser
+                // tab switch): re-report so per-title tracking stays honest.
+                if is_activated {
+                    state.report_activated();
                 }
             }
             zwlr_foreign_toplevel_handle_v1::Event::AppId { app_id } => {
                 if let Some(t) = state.toplevels.get_mut(&id) {
                     t.app_id = app_id.to_lowercase();
                 }
+                // The app-id arrived (possibly after activation): report now.
+                if is_activated {
+                    state.report_activated();
+                }
             }
             zwlr_foreign_toplevel_handle_v1::Event::State { state: states } => {
                 let activated = states.contains(&STATE_ACTIVATED);
                 if activated {
-                    if let Some(t) = state.toplevels.get(&id) {
-                        let _ = state.tx.send(Event::Window {
-                            app: t.app_id.clone(),
-                            title: t.title.clone(),
-                        });
-                    }
+                    state.activated = Some(id.clone());
+                    state.report_activated();
+                } else if state.activated.as_ref() == Some(&id) {
+                    state.activated = None;
                 }
             }
             zwlr_foreign_toplevel_handle_v1::Event::Closed => {
+                if state.activated.as_ref() == Some(&id) {
+                    state.activated = None;
+                }
                 state.toplevels.remove(&id);
                 handle.destroy();
             }
@@ -214,6 +244,7 @@ pub fn spawn(tx: Sender<Event>) -> anyhow::Result<()> {
         seat: None,
         idle_created: false,
         toplevels: HashMap::new(),
+        activated: None,
     };
     let _registry = display.get_registry(&qh, ());
     queue.roundtrip(&mut app)?;

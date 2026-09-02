@@ -10,8 +10,9 @@ verification and troubleshooting per compositor.
 |---|---|---|
 | `XDG_SESSION_TYPE=x11` | X11 EWMH poll | MIT-SCREEN-SAVER |
 | Wayland + `KDE_FULL_SESSION` | KWin script → D-Bus | ScreenSaver D-Bus |
+| Wayland + GNOME (`XDG_CURRENT_DESKTOP`…`GNOME`) | GNOME Shell extension → D-Bus | Mutter IdleMonitor |
 | Wayland + `SWAYSOCK` / `HYPRLAND_INSTANCE_SIGNATURE` / `NIRI_SOCKET` / `RIVER_UNIX_SOCKET` | wlr-foreign-toplevel | ext-idle-notify |
-| anything else (e.g. GNOME Wayland) | none in v0.2 | ScreenSaver D-Bus |
+| anything else | none (see docs) | ScreenSaver D-Bus |
 
 Check what your daemon picked:
 
@@ -94,10 +95,51 @@ but `current_window` stays `null`, file an issue with your WM's name.
 
 ## GNOME Wayland
 
-v0.2 tracks idle/AFK only — GNOME Shell (like KWin) does not expose
-toplevels to normal clients. A small GNOME Shell extension pushing to the
-same `org.chrona.Watcher` D-Bus interface is planned; the daemon side is
-already listening for it, so the extension will be the only new piece.
+GNOME Shell (like KWin) does not expose toplevels to normal clients — Mutter
+has no `wlr-foreign-toplevel` and no scripting API for outside processes.
+The window-event source is a tiny GNOME Shell extension
+(`gnome/chrona@chrona.local/`, ~100 lines) that reports focus and title
+changes to the same `org.chrona.Watcher` D-Bus interface the KWin script
+uses; the daemon listens on that interface in every session.
+
+GNOME 45–49 are supported (ESM-style extensions).
+
+**Install (either):**
+
+- `bash install.sh` from the repo root — detects GNOME and installs the
+  extension into `~/.local/share/gnome-shell/extensions/`, or
+- Chrona → Settings → *Install / update GNOME extension*, or
+- manually: `cp -r gnome/chrona@chrona.local ~/.local/share/gnome-shell/extensions/`
+  and `gnome-extensions enable chrona@chrona.local` after logging back in.
+
+GNOME only scans the extensions directory at shell startup, so **log out
+and back in once** after a fresh install.
+
+**Verify:**
+
+```bash
+# 1. the extension is known and enabled
+gnome-extensions list --enabled | grep chrona
+
+# 2. the daemon owns its D-Bus name
+qdbus6 org.chrona.Watcher /org/chrona/Watcher org.chrona.Watcher.Ping
+# → chrona   (gdbus call --session --dest org.chrona.Watcher \
+#            --object-path /org/chrona/Watcher \
+#            --method org.chrona.Watcher.Ping works too)
+
+# 3. focus a window, then check the daemon noticed
+echo '{"id":2,"cmd":"status"}' | socat - UNIX-CONNECT:$XDG_RUNTIME_DIR/chrona.sock
+# → "current_window": { "app_id": "...", "title": "..." }
+```
+
+**Notes**
+
+- Idle detection uses Mutter's `org.gnome.Mutter.IdleMonitor` (milliseconds
+  since last input, 60 s AFK threshold) — the same semantics as the X11
+  backend, better than lock-only detection. If Mutter does not answer, the
+  daemon degrades to `org.freedesktop.ScreenSaver` lock polling.
+- Budgie (which exports `Budgie:GNOME`) is detected as *unsupported*, not
+  GNOME — its shell is not stock GNOME Shell.
 
 ## PWAs and browser windows
 

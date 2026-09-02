@@ -17,6 +17,7 @@ Usage:
 import argparse
 import json
 import os
+import secrets
 import socket as syssock
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -27,7 +28,7 @@ REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 WEB = os.path.join(HERE, "web")
 
 GET_CMDS = {"status", "day", "week", "month", "app", "apps.meta", "rules", "goals", "settings.get", "export", "ping"}
-POST_CMDS = {"goal.set", "goal.del", "rule.add", "rule.del", "settings.set", "pause.set", "apps.meta"}
+POST_CMDS = {"goal.set", "goal.del", "goal.toggle", "rule.add", "rule.del", "settings.set", "pause.set", "apps.meta"}
 
 # Roots the /sysicon endpoint may serve real app icons from (the daemon
 # resolves .desktop Icon= keys to files under these).
@@ -68,8 +69,34 @@ def rpc(path, cmd, args):
         return json.dumps({"ok": False, "error": f"daemon unreachable: {e}"})
 
 
+# Optional shared-secret for the API endpoints (demo only — this is not an
+# auth system for real deployments). Set CHRONA_DEMO_TOKEN=<secret> before
+# starting the server and pass ?token=<secret> (or the Authorization header)
+# with every request. Unset (default): localhost-only, no auth.
+TOKEN = os.environ.get("CHRONA_DEMO_TOKEN")
+
+
+def under_root(path, root):
+    """True when `path` is exactly `root` or a child of it.
+    A plain startswith() is NOT enough: realpath('/usr/share/icons/')
+    normalises to '/usr/share/icons', and '/usr/share/icons-evil/x.png'
+    would pass a startswith check. Compare with an explicit separator.
+    """
+    return path == root or path.startswith(root + os.sep)
+
+
 class Handler(BaseHTTPRequestHandler):
     sock_path = "/tmp/chrona.sock"
+
+    def _authorized(self, query):
+        if not TOKEN:
+            return True
+        supplied = parse_qs(query).get("token", [""])[0]
+        header = self.headers.get("Authorization", "")
+        if header.startswith("Bearer "):
+            supplied = header[len("Bearer "):].strip()
+        # Constant-time compare — cheap and avoids timing oracles.
+        return secrets.compare_digest(supplied, TOKEN)
 
     def log_message(self, fmt, *a):  # quieter logs
         pass
@@ -120,12 +147,13 @@ class Handler(BaseHTTPRequestHandler):
             )
 
         # real system app icons resolved by the daemon from .desktop files —
-        # only files under the known icon roots, resolved and checked
+        # only files under the known icon roots, resolved and checked with an
+        # explicit path-separator boundary (see under_root).
         if u.path.startswith("/sysicon"):
             q = parse_qs(u.query).get("p", [""])[0]
             cand = os.path.realpath(q)
             if os.path.isfile(cand) and any(
-                cand == os.path.realpath(r) or cand.startswith(os.path.realpath(r))
+                under_root(cand, os.path.realpath(r))
                 for r in ICON_ROOTS
                 if os.path.isdir(r)
             ):
@@ -133,6 +161,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(403, "forbidden", "text/plain")
 
         if u.path.startswith("/api/"):
+            if not self._authorized(u.query):
+                return self._send(401, json.dumps({"ok": False, "error": "invalid or missing token"}))
             cmd = u.path[len("/api/"):]
             if cmd not in GET_CMDS:
                 return self._send(403, json.dumps({"ok": False, "error": "command not allowed over HTTP"}))
@@ -153,6 +183,8 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         if not u.path.startswith("/api/"):
             return self._send(404, "not found", "text/plain")
+        if not self._authorized(u.query):
+            return self._send(401, json.dumps({"ok": False, "error": "invalid or missing token"}))
         cmd = u.path[len("/api/"):]
         if cmd not in POST_CMDS:
             return self._send(403, json.dumps({"ok": False, "error": "command not allowed over HTTP"}))
@@ -170,8 +202,21 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--socket", default=os.environ.get("CHRONA_SOCK", "/tmp/chrona.sock"))
     ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", "3000")))
-    ap.add_argument("--host", default="0.0.0.0")
+    # Default: loopback only. The server relays chronad's local API to the
+    # network — binding 0.0.0.0 by default would expose your window history
+    # to everyone on the LAN. Pass --host explicitly (and set a token) to
+    # deliberately share the demo.
+    ap.add_argument(
+        "--host",
+        default=os.environ.get("CHRONA_DEMO_HOST", "127.0.0.1"),
+    )
     args = ap.parse_args()
+    if args.host not in ("127.0.0.1", "localhost", "::1") and not TOKEN:
+        print(
+            "warning: binding a non-loopback host without CHRONA_DEMO_TOKEN — "
+            "anyone on the network can read your stats and edit goals",
+            file=sys.stderr,
+        )
     Handler.sock_path = args.socket
     print(f"chrona demo ui on http://{args.host}:{args.port} (daemon socket: {args.socket})")
     srv = ThreadingHTTPServer((args.host, args.port), Handler)

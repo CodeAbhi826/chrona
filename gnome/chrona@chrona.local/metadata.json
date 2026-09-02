@@ -1,0 +1,8 @@
+{
+  "uuid": "chrona@chrona.local",
+  "name": "Chrona Watcher",
+  "description": "Reports the focused window to the local Chrona daemon over the session bus. No data ever leaves the machine.",
+  "url": "https://github.com/CodeAbhi826/chrona",
+  "version": 1,
+  "shell-version": ["45", "46", "47", "48", "49"]
+}

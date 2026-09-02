@@ -32,17 +32,17 @@ function renderGoals() {
         <div class="hbar-line ${exceeded ? "over" : ""}"><i style="width:${(progress * 100).toFixed(1)}%"></i></div>
         <div class="goal-used">${fmtDur(g.used_seconds)} of ${fmtDur(g.limit_seconds)} today</div>
       </div>
-      <div class="switch ${g.enabled ? "on" : ""}" data-goal-toggle="${g.id}" role="switch" tabindex="0"></div>
-      <button class="btn text" data-goal-del="${g.id}">Remove</button>
+      <div class="switch ${g.enabled ? "on" : ""}" data-goal-toggle="${esc(String(g.id))}" role="switch" tabindex="0"></div>
+      <button class="btn text" data-goal-del="${esc(String(g.id))}">Remove</button>
     </div>`;
   }).join("");
   el.querySelectorAll("[data-goal-del]").forEach((b) =>
     b.addEventListener("click", async () => { await apiPost("goal.del", { id: +b.dataset.goalDel }); await refreshGoals(); }));
   el.querySelectorAll("[data-goal-toggle]").forEach((s) =>
     s.addEventListener("click", async () => {
-      const g = state.goals.find((x) => x.id === +s.dataset.goalToggle);
-      if (!g) return;
-      await apiPost("goal.set", { kind: g.kind, key: g.key, limit_seconds: g.limit_seconds, enabled: !g.enabled });
+      // Atomic server-side toggle — the old read-modify-write `goal.set`
+      // raced against other clients.
+      await apiPost("goal.toggle", { id: +s.dataset.goalToggle });
       await refreshGoals();
     }));
 }
@@ -69,6 +69,9 @@ const FOCUS_LOG = "chrona-focus-log";
 
 const focus = {
   duration: 25 * 60, remaining: 25 * 60, running: false, paused: false, timer: null, log: [],
+  // Absolute wall-clock deadline (ms) while running: setInterval drifts
+  // (throttled background tabs, busy event loops), a deadline does not.
+  endsAt: 0,
 };
 
 function focusLoad() {
@@ -110,22 +113,35 @@ function focusComplete() {
 }
 
 function focusTickSec() {
-  focus.remaining--;
+  // Derive the remaining time from the deadline, not a decrement — a
+  // throttled or delayed interval must never stretch a 25-minute session.
+  focus.remaining = Math.max(0, Math.round((focus.endsAt - Date.now()) / 1000));
   if (focus.remaining <= 0) { focusComplete(); return; }
   renderFocus();
 }
 
 function focusStart() {
-  if (focus.paused) { focus.paused = false; focus.timer = setInterval(focusTickSec, 1000); renderFocus(); return; }
+  if (focus.paused) {
+    focus.paused = false;
+    focus.endsAt = Date.now() + focus.remaining * 1000;
+    focus.timer = setInterval(focusTickSec, 1000);
+    renderFocus();
+    return;
+  }
   focus.running = true;
   focus.remaining = focus.duration;
+  focus.endsAt = Date.now() + focus.duration * 1000;
   focus.timer = setInterval(focusTickSec, 1000);
   renderFocus();
   toast("Focus session started.");
 }
 
 function focusPauseToggle() {
-  if (focus.running && !focus.paused) { focus.paused = true; clearInterval(focus.timer); }
+  if (focus.running && !focus.paused) {
+    focus.paused = true;
+    focus.remaining = Math.max(0, Math.round((focus.endsAt - Date.now()) / 1000));
+    clearInterval(focus.timer);
+  }
   else if (focus.paused) { return focusStart(); }
   renderFocus();
 }
@@ -154,7 +170,7 @@ function renderFocusLog() {
   $("focusLog").innerHTML = focus.log.slice(0, 10).map((s) => {
     const d = new Date(s.at);
     return `<div class="focus-row">
-      <span class="fx"><span class="a">${s.mins} minute${s.mins > 1 ? "s" : ""}</span>
+      <span class="fx"><span class="a">${esc(String(s.mins))} minute${s.mins > 1 ? "s" : ""}</span>
       <span class="b">${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} · ${d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span></span>
       <span class="len">✓</span></div>`;
   }).join("");

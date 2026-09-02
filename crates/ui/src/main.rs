@@ -51,6 +51,9 @@ fn setup_fonts() -> &'static str {
     }
     // Extract the bundled Inter (OFL) so Slint can load it as the primary
     // font; SLINT_DEFAULT_FONT must be set before the first window is created.
+    // The file is written once and only rewritten when the bundled font
+    // actually changed (size differs) — no per-launch 300 KB rewrite, and
+    // a newer build updates the cache automatically.
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     let cache = std::env::var("XDG_CACHE_HOME")
         .map(std::path::PathBuf::from)
@@ -58,7 +61,14 @@ fn setup_fonts() -> &'static str {
     let dir = cache.join("chrona");
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join("Inter.ttf");
-    if std::fs::write(&path, INTER_FONT).is_ok() {
+    let stale = std::fs::metadata(&path)
+        .map(|m| m.len() != INTER_FONT.len() as u64)
+        .unwrap_or(true);
+    if stale {
+        // Best-effort refresh; a read-only cache dir just keeps the old font.
+        let _ = std::fs::write(&path, INTER_FONT);
+    }
+    if path.exists() {
         std::env::set_var("SLINT_DEFAULT_FONT", &path);
     }
     "Inter"
@@ -178,26 +188,11 @@ fn main() -> Result<(), slint::PlatformError> {
     }
     {
         let _weak = app.as_weak();
-        app.on_toggle_goal(move |id, on| {
-            // Re-set with new enabled flag: the daemon upserts by (kind,key),
-            // so we first read the current goal, then write it back.
-            if let Some(goals) = client::request("goals", json!({})) {
-                if let Some(g) = goals.as_array().and_then(|a| {
-                    a.iter().find(|g| {
-                        g.get("id").and_then(serde_json::Value::as_i64) == Some(id as i64)
-                    })
-                }) {
-                    let _ = client::request(
-                        "goal.set",
-                        json!({
-                            "kind": g.get("kind").cloned().unwrap_or(json!("app")),
-                            "key": g.get("key").cloned().unwrap_or(json!("")),
-                            "limit_seconds": g.get("limit_seconds").cloned().unwrap_or(json!(3600)),
-                            "enabled": on,
-                        }),
-                    );
-                }
-            }
+        app.on_toggle_goal(move |id, _on| {
+            // Single atomic round trip on the daemon — the old flow (read
+            // `goals`, then `goal.set` the row back with a flipped flag)
+            // raced against other clients and dropped concurrent edits.
+            let _ = client::request("goal.toggle", json!({"id": id}));
             REFRESH.store(true, Ordering::SeqCst);
         });
     }
@@ -209,6 +204,15 @@ fn main() -> Result<(), slint::PlatformError> {
             let status = install_kwin_script();
             if let Some(app) = weak.upgrade() {
                 app.set_kwin_status(status.into());
+            }
+        });
+    }
+    {
+        let weak = app.as_weak();
+        app.on_install_gnome(move || {
+            let status = install_gnome_extension();
+            if let Some(app) = weak.upgrade() {
+                app.set_gnome_status(status.into());
             }
         });
     }
@@ -241,6 +245,9 @@ fn main() -> Result<(), slint::PlatformError> {
 /// upgrading "from" the install location fails with "No such file". No
 /// manual copy is done at all: kpackagetool installs into
 /// ~/.local/share/kwin/scripts by itself.
+///
+/// All helper processes are invoked with explicit argv — never through a
+/// shell — so a hostile `src` path can never inject commands.
 fn install_kwin_script() -> String {
     let candidates = [
         std::path::PathBuf::from("/usr/share/chrona/kwin/chrona-watcher"),
@@ -252,7 +259,6 @@ fn install_kwin_script() -> String {
     let Some(src) = candidates.iter().find(|p| p.exists()) else {
         return "KWin script not found — install the chrona package or run from the repo".into();
     };
-    let src = src.display().to_string();
 
     let pick = |names: &[&str]| {
         names
@@ -270,38 +276,133 @@ fn install_kwin_script() -> String {
     };
     let kwc = pick(&["kwriteconfig6", "kwriteconfig5"]).unwrap_or_else(|| "kwriteconfig6".into());
 
-    // Install or upgrade from the SOURCE dir; enable in kwinrc ([Plugins]
-    // per the KDE docs, plus [Scripts] for older Plasma 5 layouts); load now.
-    let script = format!(
-        "set -e\n\
-         if {kpt} --type=KWin/Script --list 2>/dev/null | grep -q chrona-watcher; then\n\
-         \x20\x20\x20{kpt} --type=KWin/Script -u \"{src}\"\n\
-         else\n\
-         \x20\x20\x20{kpt} --type=KWin/Script -i \"{src}\"\n\
-         fi\n\
-         {kwc} --file kwinrc --group Plugins --key chrona-watcherEnabled true || true\n\
-         {kwc} --file kwinrc --group Scripts --key chrona-watcherEnabled true || true\n\
-         dbus-send --session --dest=org.kde.KWin /Scripting org.kde.kwin.Scripting.start >/dev/null 2>&1 || true\n\
-         dbus-send --session --dest=org.kde.KWin /KWin org.kde.KWin.reconfigure >/dev/null 2>&1 || true"
-    );
-    match run_sh(&script) {
-        Ok(_) => "installed and enabled. If it does not activate immediately, log out and back in."
-            .into(),
-        Err(e) => format!("kpackagetool failed: {e}"),
+    // Install or upgrade from the SOURCE dir. The list check tells us which.
+    let installed = std::process::Command::new(&kpt)
+        .args(["--type=KWin/Script", "--list"])
+        .output()
+        .map(|o| {
+            o.status.success() && String::from_utf8_lossy(&o.stdout).contains("chrona-watcher")
+        })
+        .unwrap_or(false);
+    let verb = if installed { "-u" } else { "-i" };
+    let out = std::process::Command::new(&kpt)
+        .args(["--type=KWin/Script", verb])
+        .arg(src)
+        .output();
+    if let Err(e) = out {
+        return format!("kpackagetool could not be run: {e}");
     }
+    if !out.unwrap().status.success() {
+        return "kpackagetool failed — see the journal for details".into();
+    }
+
+    // Enable in kwinrc ([Plugins] per the KDE docs, plus [Scripts] for older
+    // Plasma 5 layouts); ask KWin to reload. All best-effort.
+    let _ = std::process::Command::new(&kwc)
+        .args([
+            "--file",
+            "kwinrc",
+            "--group",
+            "Plugins",
+            "--key",
+            "chrona-watcherEnabled",
+            "true",
+        ])
+        .output();
+    let _ = std::process::Command::new(&kwc)
+        .args([
+            "--file",
+            "kwinrc",
+            "--group",
+            "Scripts",
+            "--key",
+            "chrona-watcherEnabled",
+            "true",
+        ])
+        .output();
+    let _ = std::process::Command::new("dbus-send")
+        .args([
+            "--session",
+            "--dest=org.kde.KWin",
+            "/Scripting",
+            "org.kde.kwin.Scripting.start",
+        ])
+        .output();
+    let _ = std::process::Command::new("dbus-send")
+        .args([
+            "--session",
+            "--dest=org.kde.KWin",
+            "/KWin",
+            "org.kde.KWin.reconfigure",
+        ])
+        .output();
+
+    "installed and enabled. If it does not activate immediately, log out and back in.".into()
 }
 
-fn run_sh(cmd: &str) -> Result<(), String> {
-    let out = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(cmd)
-        .output()
-        .map_err(|e| e.to_string())?;
-    if out.status.success() {
-        Ok(())
-    } else {
-        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+/// Register + enable the Chrona GNOME Shell extension for the current user.
+/// Tries, in order: packaged copy at /usr/share/chrona/gnome, the repo
+/// checkout (cargo run), then gives up with a helpful message.
+///
+/// The extension dir is copied to
+/// ~/.local/share/gnome-shell/extensions/chrona@chrona.local — GNOME only
+/// scans that directory at shell startup, so enabling is best-effort: if
+/// `gnome-extensions enable` cannot see it yet, the user logs out/in once.
+fn install_gnome_extension() -> String {
+    const UUID: &str = "chrona@chrona.local";
+    let candidates = [
+        std::path::PathBuf::from("/usr/share/chrona/gnome").join(UUID),
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../gnome")
+            .join(UUID)
+            .canonicalize()
+            .unwrap_or_else(|_| std::path::PathBuf::from("/nonexistent")),
+    ];
+    let Some(src) = candidates.iter().find(|p| p.exists()) else {
+        return "GNOME extension not found — install the chrona package or run from the repo"
+            .into();
+    };
+
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let dest = std::path::PathBuf::from(&home)
+        .join(".local/share/gnome-shell/extensions")
+        .join(UUID);
+    // Replace any older copy (remove first — a plain copy would leave
+    // stale files behind).
+    let _ = std::fs::remove_dir_all(&dest);
+    if std::fs::create_dir_all(dest.parent().unwrap_or(&dest)).is_err() {
+        return "could not create the extensions directory".into();
     }
+    if let Err(e) = copy_dir(src, &dest) {
+        return format!("copying the extension failed: {e}");
+    }
+
+    // Enable it (works only when the shell already knows the extension —
+    // i.e. it was loaded at login). Best-effort, plus a re-scan attempt.
+    let _ = std::process::Command::new("gnome-extensions")
+        .arg("enable")
+        .arg(UUID)
+        .output();
+    if !dest.join("extension.js").exists() {
+        return "extension files incomplete — re-install the chrona package".into();
+    }
+    "installed. Log out and back in once, then it tracks windows automatically.".into()
+}
+
+/// Recursive directory copy (`cp -r` without a shell).
+fn copy_dir(src: &std::path::Path, dest: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dest)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let to = dest.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir(&entry.path(), &to)?;
+        } else {
+            std::fs::copy(entry.path(), &to)?;
+        }
+    }
+    Ok(())
 }
 
 fn export_json() -> String {

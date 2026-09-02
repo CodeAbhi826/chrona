@@ -190,43 +190,58 @@ fn notify(title: &str, body: &str, urgency: Urgency, timeout_ms: i32) {
     #[cfg(feature = "dbus")]
     {
         use std::collections::HashMap;
-        let Ok(conn) = zbus::blocking::Connection::session() else {
-            return; // headless box, nothing to notify
+        use std::sync::{Mutex, OnceLock};
+        // One session-bus connection for the daemon's lifetime, created on
+        // first use. v0.2 opened a NEW connection (with its own socket +
+        // reader task) for every single notification and never closed it —
+        // a slow fd/thread leak on nag-heavy setups. If the call fails
+        // (bus restarted), the cached connection is dropped and rebuilt on
+        // the next notification.
+        static CONN: OnceLock<Mutex<Option<zbus::blocking::Connection>>> = OnceLock::new();
+        let conn_slot = CONN.get_or_init(|| Mutex::new(None));
+
+        let call = |conn: &zbus::blocking::Connection| -> zbus::Result<()> {
+            let proxy = zbus::blocking::Proxy::new(
+                conn,
+                "org.freedesktop.Notifications",
+                "/org/freedesktop/Notifications",
+                "org.freedesktop.Notifications",
+            )?;
+            let mut hints = HashMap::<String, zbus::zvariant::Value>::new();
+            hints.insert(
+                "urgency".into(),
+                zbus::zvariant::Value::U8(match urgency {
+                    Urgency::Normal => 1,
+                    Urgency::Critical => 2,
+                }),
+            );
+            proxy.call_method(
+                "Notify",
+                &(
+                    "chronad",
+                    0u32,
+                    "chrona",
+                    title,
+                    body,
+                    Vec::<String>::new(),
+                    hints,
+                    timeout_ms,
+                ),
+            )?;
+            Ok(())
         };
-        let proxy = match zbus::blocking::Proxy::new(
-            &conn,
-            "org.freedesktop.Notifications",
-            "/org/freedesktop/Notifications",
-            "org.freedesktop.Notifications",
-        ) {
-            Ok(p) => p,
-            Err(e) => {
-                eprintln!("[chronad] notification proxy failed: {e}");
-                return;
+
+        let mut slot = conn_slot.lock().unwrap();
+        if slot.is_none() {
+            *slot = zbus::blocking::Connection::session().ok();
+        }
+        if let Some(conn) = slot.as_ref() {
+            if let Err(e) = call(conn) {
+                eprintln!("[chronad] notification failed: {e}");
+                // Stale connection (bus restarted): drop it so the next
+                // notification rebuilds a fresh one.
+                *slot = None;
             }
-        };
-        let mut hints = HashMap::<String, zbus::zvariant::Value>::new();
-        hints.insert(
-            "urgency".into(),
-            zbus::zvariant::Value::U8(match urgency {
-                Urgency::Normal => 1,
-                Urgency::Critical => 2,
-            }),
-        );
-        if let Err(e) = proxy.call_method(
-            "Notify",
-            &(
-                "chronad",
-                0u32,
-                "chrona",
-                title,
-                body,
-                Vec::<String>::new(),
-                hints,
-                timeout_ms,
-            ),
-        ) {
-            eprintln!("[chronad] notification failed: {e}");
         }
     }
     #[cfg(not(feature = "dbus"))]

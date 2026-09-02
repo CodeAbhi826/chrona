@@ -6,6 +6,10 @@
 // (resource_name, resource_class, caption). Everything stays on the session
 // bus — nothing leaves the machine.
 //
+// Title changes on the FOCUSED window (switching browser tabs, renaming a
+// terminal) are re-reported too — without them, the new tab's time would
+// silently accrue under the old title.
+//
 // SPDX-License-Identifier: MIT
 
 function report(client) {
@@ -28,7 +32,30 @@ function report(client) {
     }
 }
 
+// Only the active window matters; title changes of background windows are
+// noise the daemon would discard anyway.
+function reportIfActive(client) {
+    if (client && client === workspace.activeWindow) {
+        report(client);
+    }
+}
+
+function watchTitle(client) {
+    if (!client) {
+        return;
+    }
+    try {
+        client.titleChanged.connect(() => reportIfActive(client));
+    } catch (e) {
+        // Older Plasma without the signal: focus events still cover us.
+    }
+}
+
 workspace.windowActivated.connect(report);
+
+// Title-change tracking for every window as it appears.
+workspace.windowAdded.connect(watchTitle);
+workspace.windowList().forEach(watchTitle);
 
 // Report the currently focused window at script load: covers KWin restarts
 // and re-loads without waiting for the next focus change.

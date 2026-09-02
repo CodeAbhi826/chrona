@@ -50,47 +50,66 @@ impl Store {
         &self.path
     }
 
+    /// Versioned schema migrations. `PRAGMA user_version` records the
+    /// applied schema version; each step below upgrades `v` to the next
+    /// version inside a transaction. Databases created before this runner
+    /// existed carry `user_version == 0` and are adopted by step 1 (all of
+    /// its statements are `IF NOT EXISTS`, so existing tables are kept as-is).
+    ///
+    /// To add a column or change a constraint in the future: append a new
+    /// `if v < N { ... }` step bumping `user_version` to `N` — never edit an
+    /// old step, never bump the same version twice.
     fn migrate(&self) -> anyhow::Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.busy_timeout(std::time::Duration::from_millis(5000))?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                start INTEGER NOT NULL,
-                end INTEGER NOT NULL,
-                app_id TEXT NOT NULL,
-                title TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_events_start ON events(start);
-            CREATE INDEX IF NOT EXISTS idx_events_app ON events(app_id);
-            CREATE TABLE IF NOT EXISTS afk (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                start INTEGER NOT NULL,
-                end INTEGER NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_afk_start ON afk(start);
-            CREATE TABLE IF NOT EXISTS rules (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pattern TEXT NOT NULL,
-                field TEXT NOT NULL,
-                category TEXT NOT NULL,
-                priority INTEGER NOT NULL DEFAULT 100
-            );
-            CREATE TABLE IF NOT EXISTS goals (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                kind TEXT NOT NULL,
-                key TEXT NOT NULL,
-                limit_seconds INTEGER NOT NULL,
-                enabled INTEGER NOT NULL DEFAULT 1,
-                UNIQUE(kind, key)
-            );
-            CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );",
-        )?;
+
+        let v: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+
+        // Step 1: the v0.2.x baseline schema.
+        if v < 1 {
+            conn.execute_batch(
+                "BEGIN;
+                CREATE TABLE IF NOT EXISTS events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    start INTEGER NOT NULL,
+                    end INTEGER NOT NULL,
+                    app_id TEXT NOT NULL,
+                    title TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_events_start ON events(start);
+                CREATE INDEX IF NOT EXISTS idx_events_app ON events(app_id);
+                CREATE TABLE IF NOT EXISTS afk (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    start INTEGER NOT NULL,
+                    end INTEGER NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_afk_start ON afk(start);
+                CREATE TABLE IF NOT EXISTS rules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pattern TEXT NOT NULL,
+                    field TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    priority INTEGER NOT NULL DEFAULT 100
+                );
+                CREATE TABLE IF NOT EXISTS goals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    kind TEXT NOT NULL,
+                    key TEXT NOT NULL,
+                    limit_seconds INTEGER NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    UNIQUE(kind, key)
+                );
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                PRAGMA user_version = 1;
+                COMMIT;",
+            )?;
+        }
+
         Ok(())
     }
 
@@ -259,6 +278,29 @@ impl Store {
         Ok(id)
     }
 
+    /// Atomically flip a goal's `enabled` flag in one UPDATE — no
+    /// read-modify-write, so concurrent API clients cannot clobber each
+    /// other's toggle. Returns the new state, or `None` if the id does not
+    /// exist.
+    pub fn toggle_goal(&self, id: i64) -> anyhow::Result<Option<bool>> {
+        let conn = self.conn.lock().unwrap();
+        let updated = conn.execute(
+            "UPDATE goals SET enabled = 1 - enabled WHERE id = ?1",
+            params![id],
+        )?;
+        if updated == 0 {
+            return Ok(None);
+        }
+        let enabled: Option<i64> = conn
+            .query_row(
+                "SELECT enabled FROM goals WHERE id = ?1",
+                params![id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(enabled.map(|e| e != 0))
+    }
+
     pub fn remove_goal(&self, id: i64) -> anyhow::Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute("DELETE FROM goals WHERE id = ?1", params![id])?;
@@ -377,6 +419,35 @@ mod tests {
         assert!(!goals[0].enabled);
         s.remove_goal(id1).unwrap();
         assert!(s.goals().unwrap().is_empty());
+    }
+
+    #[test]
+    fn goal_toggle_is_atomic_and_reports_state() {
+        let s = tmp_store("toggle");
+        let id = s.set_goal("app", "firefox", 3600, true).unwrap();
+        assert_eq!(s.toggle_goal(id).unwrap(), Some(false));
+        assert_eq!(s.toggle_goal(id).unwrap(), Some(true));
+        // Unknown id: no row touched, reported as None.
+        assert_eq!(s.toggle_goal(9999).unwrap(), None);
+    }
+
+    #[test]
+    fn schema_version_is_recorded_and_stable() {
+        let dir = std::env::temp_dir().join(format!("chrona-store-mig-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let db = dir.join("t.db");
+        {
+            let s = Store::open(&db).unwrap();
+            let v: i64 = s
+                .conn
+                .lock()
+                .unwrap()
+                .query_row("PRAGMA user_version", [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(v, 1);
+        }
+        // Reopening an already-migrated database is a no-op, not an error.
+        let _ = Store::open(&db).unwrap();
     }
 
     #[test]

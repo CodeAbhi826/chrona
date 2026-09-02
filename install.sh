@@ -15,8 +15,8 @@
 #   shells  : bash, zsh, fish, anything — a system install needs no shell
 #             config; --user mode edits the rc file of the login shell
 #   desktops: KDE Plasma 6/5 (Wayland or X11) · Sway/Hyprland/river/niri ·
-#             any X11 session · GNOME (idle/AFK tracking; window events
-#             need the planned Shell extension)
+#             any X11 session · GNOME Wayland (Shell extension) ·
+#             GNOME X11 (EWMH polling)
 #
 # Usage:
 #   bash install.sh                # system install (uses sudo), latest release;
@@ -421,9 +421,68 @@ if $IS_KDE; then
     fi
 else
     case "$DE $SESSION" in
-        *gnome*) warn "GNOME: idle/AFK tracking works; per-app window events need the GNOME Shell extension (roadmap)" ;;
         *sway*|*hypr*|*river*|*niri*) ok "wlroots compositor — wlr-foreign-toplevel works out of the box" ;;
         *) [ "$SESSION" = x11 ] && ok "X11 session — EWMH watcher works out of the box" || warn "unrecognised desktop ($DE) — the daemon will try ScreenSaver idle polling" ;;
+    esac
+fi
+
+# --------------------------------------------------------- GNOME extension ----
+# GNOME Shell only scans ~/.local/share/gnome-shell/extensions at login, so
+# we copy the files now and enable them best-effort — the user logs out/in
+# once and everything else is automatic.
+GNOME_EXT_UUID="chrona@chrona.local"
+IS_GNOME=false
+GNOME_PKG_DONE=false
+case ":${XDG_CURRENT_DESKTOP:-}:" in
+    *:[Gg][Nn][Oo][Mm][Ee]:*) IS_GNOME=true ;;
+esac
+# Budgie exports "Budgie:GNOME" but is not stock GNOME Shell — skip it.
+case ":${XDG_CURRENT_DESKTOP:-}:" in
+    *:[Bb]udgie:*) IS_GNOME=false ;;
+esac
+if [ "$SESSION" = x11 ]; then IS_GNOME=false; fi   # X11 GNOME uses EWMH polling
+
+if $IS_GNOME && [ -n "$SESSION" -o -n "${WAYLAND_DISPLAY:-}" ]; then
+    log "GNOME detected — installing the Chrona Shell extension"
+    gsrc=""
+    if [ -n "$REPO_DIR" ] && [ -f "$REPO_DIR/gnome/$GNOME_EXT_UUID/metadata.json" ]; then
+        gsrc="$REPO_DIR/gnome/$GNOME_EXT_UUID"
+    else
+        gsrc="$TMP/gnome-ext"
+        mkdir -p "$gsrc"
+        fetch "$(raw gnome/$GNOME_EXT_UUID/metadata.json)" "$gsrc/metadata.json" \
+            && fetch "$(raw gnome/$GNOME_EXT_UUID/extension.js)" "$gsrc/extension.js" \
+            || gsrc=""
+    fi
+    if [ -n "$gsrc" ]; then
+        # Keep a stable system copy (mirrors the KWin layout) and install
+        # the user copy GNOME actually loads.
+        if [ "$MODE" = system ]; then
+            as_root mkdir -p /usr/share/chrona/gnome
+            as_root rm -rf "/usr/share/chrona/gnome/$GNOME_EXT_UUID"
+            as_root cp -r "$gsrc" "/usr/share/chrona/gnome/$GNOME_EXT_UUID"
+        else
+            mkdir -p "$HOME/.local/share/chrona/gnome"
+            rm -rf "$HOME/.local/share/chrona/gnome/$GNOME_EXT_UUID"
+            cp -r "$gsrc" "$HOME/.local/share/chrona/gnome/$GNOME_EXT_UUID"
+        fi
+        extdir="$HOME/.local/share/gnome-shell/extensions"
+        mkdir -p "$extdir"
+        rm -rf "$extdir/$GNOME_EXT_UUID"
+        cp -r "$gsrc" "$extdir/$GNOME_EXT_UUID"
+        if command -v gnome-extensions >/dev/null 2>&1; then
+            # Works when the shell already knows the extension (re-install);
+            # a fresh install needs the one-time logout below.
+            gnome-extensions enable "$GNOME_EXT_UUID" >/dev/null 2>&1 || true
+        fi
+        ok "GNOME extension installed — log out and back in once to activate it"
+        GNOME_PKG_DONE=true
+    else
+        warn "could not fetch the GNOME extension — run Chrona → Settings → Install GNOME extension later"
+    fi
+else
+    case "$DE $SESSION" in
+        *gnome*) warn "GNOME: idle/AFK tracking works; per-app window events need the GNOME Shell extension (see docs/WATCHERS.md)" ;;
     esac
 fi
 
@@ -494,9 +553,9 @@ else
     warn "daemon did not come up yet — check: systemctl --user status chrona"
 fi
 
-# End-to-end test: push a window event exactly like the KWin script does and
-# confirm it shows up in status.current_window.
-if $IS_KDE; then
+# End-to-end test: push a window event exactly like the KWin script / GNOME
+# extension does and confirm it shows up in status.current_window.
+if $IS_KDE || $IS_GNOME; then
     log "end-to-end test (window event -> status)"
     if dbus-send --session --print-reply=literal --dest=org.chrona.Watcher \
             /org/chrona/Watcher org.chrona.Watcher.ActiveWindowChanged \
@@ -518,5 +577,6 @@ printf '  binaries   %s/chrona  and  %s/chronad\n' "$BIN" "$BIN"
 [ -z "$AUTOSTART" ] && printf '  service    systemctl --user status chrona\n' \
                     || printf '  service    ~/.config/autostart/chronad.desktop\n'
 $KWIN_PKG_DONE && printf '  kwin       watcher script enabled\n'
+$GNOME_PKG_DONE && printf '  gnome      extension installed (log out/in once)\n'
 printf '  launch     %schrona%s  (dashboard)\n' "$BOLD" "$RST"
 [ -z "$AUTOSTART" ] || printf '\n  note: without systemd the daemon was started for this session only.\n'

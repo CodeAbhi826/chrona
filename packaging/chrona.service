@@ -4,6 +4,13 @@ Documentation=https://github.com/CodeAbhi826/chrona
 PartOf=graphical-session.target
 After=graphical-session.target
 
+# A crash-looping daemon must not pin the CPU: allow at most 5 restarts
+# per minute before giving up (the default systemd limits are far more
+# generous, 5 per 10s, which is fine for a transient failure but lets a
+# real crash-loop spin indefinitely).
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
 [Service]
 Type=simple
 ExecStart=/usr/bin/chronad

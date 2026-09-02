@@ -63,6 +63,7 @@ export component ChronaApp inherits Window {
     in-out property <string> version-line: "";
     in-out property <string> idle-line: "";
     in-out property <string> kwin-status: "";
+    in-out property <string> gnome-status: "";
     in-out property <string> export-path: "";
     in-out property <string> db-path: "";
     in-out property <bool> tracking-paused: false;
@@ -77,6 +78,7 @@ export component ChronaApp inherits Window {
     callback toggle-goal(int, bool);
     callback goal-kind-changed(string);
     callback install-kwin();
+    callback install-gnome();
     callback do-export();
     callback refresh();
 
@@ -259,12 +261,14 @@ export component ChronaApp inherits Window {
                         idle-line: root.idle-line;
                         version-line: root.version-line;
                         kwin-status: root.kwin-status;
+                        gnome-status: root.gnome-status;
                         export-path: root.export-path;
                         db-path: root.db-path;
                         paused: root.tracking-paused;
                         toggle-theme(on) => { root.toggle-theme(on); }
                         toggle-pause(on) => { root.toggle-pause(on); }
                         install-kwin => { root.install-kwin(); }
+                        install-gnome => { root.install-gnome(); }
                         do-export => { root.do-export(); }
                     }
                 }

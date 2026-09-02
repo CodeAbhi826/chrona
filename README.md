@@ -182,24 +182,27 @@ Details in [tools/demo/README.md](tools/demo/README.md).
 | Session | Window tracking | Idle tracking | Notes |
 |---|---|---|---|
 | **KDE Plasma 6 (Wayland)** | ✅ KWin script → D-Bus | ✅ ScreenSaver D-Bus | One-click install from Settings |
+| **GNOME 45+ (Wayland)** | ✅ Shell extension → D-Bus | ✅ Mutter IdleMonitor | One-time log out/in after install |
 | **Sway / Hyprland / river / niri** (Wayland) | ✅ `wlr-foreign-toplevel` | ✅ `ext-idle-notify` | Works out of the box |
 | **Any X11 session** (incl. KDE/GNOME on X11) | ✅ EWMH polling | ✅ MIT-SCREEN-SAVER | Works out of the box |
-| **GNOME Wayland** | ⚠️ v0.2: no window events | ✅ ScreenSaver D-Bus | Needs a GNOME Shell extension — see [the roadmap](#roadmap) |
 | PWAs | ✅ | ✅ | PWAs are separate windows with their own titles, so they are tracked like any app |
 
 KDE Wayland deserves a note: KWin intentionally does not implement the
 `wlr-foreign-toplevel` protocol other compositors use. Chrona ships a tiny
 KWin script (~30 lines) that reports window activations over the session
 bus — the same trick nothing else on the market combines with a full GUI.
+GNOME Wayland gets the same treatment via a ~100-line GNOME Shell
+extension reporting to the identical D-Bus interface.
 
 ## Architecture
 
 ```
 ┌────────────────────────────── your session ──────────────────────────────┐
 │                                                                          │
-│  KWin script ──D-Bus──┐      wlr-foreign-toplevel ──┐    X11 EWMH poll   │
-│  (Plasma Wayland)     │      (Sway/Hyprland/…)     │    (X11 sessions)  │
-│                       ▼                           ▼            ▼        │
+│  KWin script ──D-Bus──┐  GNOME ext ──D-Bus──┐  wlr-foreign-toplevel ──┐ │
+│  (Plasma Wayland)     │  (GNOME Wayland)    │  (Sway/Hyprland/…)     │ │
+│  X11 EWMH poll ───────┴──────────────────────┴──────────┐             │ │
+│  (X11 sessions)         ▼                               ▼             │
 │                 ┌──────────────────────────────────────────────────┐    │
 │                 │ chronad — Rust daemon (systemd --user, ~10 MB)   │    │
 │                 │  • event fold → SQLite (one file, WAL)           │    │
@@ -269,7 +272,7 @@ goal-driven, native take for the Linux desktop.
 
 ## Roadmap
 
-- [ ] GNOME Wayland shell extension (window events)
+- [x] GNOME Wayland shell extension (window events) — shipped
 - [ ] Enforcement: soft-block "take a break" screen when a limit is hit
 - [ ] Focus sessions wired to Do Not Disturb (KDE + GNOME D-Bus)
 - [ ] Per-day-of-week limit schedules (weekend vs weekday budgets)
@@ -302,18 +305,27 @@ promised.
 seconds of CPU per day. The event pipeline folds window activations into
 second-resolution rows; a year of history stays in single-digit megabytes.
 
-### Why is GNOME Wayland only partially supported?
+### Why does GNOME Wayland need an extension?
 
 GNOME Shell, like KDE's KWin, doesn't implement `wlr-foreign-toplevel` — and
-unlike KDE, it has no user-installable script hook. Window-event tracking
-needs a GNOME Shell extension (see the [roadmap](#roadmap)); idle tracking
-already works there today.
+unlike KDE, it has no user-installable script hook. So Chrona ships a small
+GNOME Shell extension (~100 lines, `gnome/chrona@chrona.local/`) that reports
+window focus to the daemon over the session bus — install it via
+`bash install.sh`, the Settings page, or see [docs/WATCHERS.md](docs/WATCHERS.md).
+Idle tracking (Mutter IdleMonitor) works without it.
 
 ### I'm on KDE Wayland and nothing is being tracked
 
 Install the KWin watcher: Chrona → Settings → **Install KWin watcher**, then
 switch windows a few times. See [docs/WATCHERS.md](docs/WATCHERS.md) for
 verification steps and troubleshooting.
+
+### I'm on GNOME Wayland and nothing is being tracked
+
+Install the extension (Chrona → Settings → **Install GNOME extension** or
+`bash install.sh`), then **log out and back in once** — GNOME only loads
+extensions at shell startup. Verify with `gnome-extensions list --enabled |
+grep chrona`, then switch windows and check the dashboard.
 
 ## Contributing
 

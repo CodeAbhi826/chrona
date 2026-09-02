@@ -1,6 +1,6 @@
 use crate::model::{AfkSession, AppUsage, CategoryUsage, DayUsage, TitleUsage, WindowEvent};
 use crate::rules::RuleSet;
-use chrono::{Local, NaiveDate, TimeZone};
+use chrono::{Local, TimeZone};
 use std::collections::HashMap;
 
 /// Subtract all AFK sessions from the events, splitting events where an AFK
@@ -124,8 +124,16 @@ pub fn hourly(events: &[WindowEvent]) -> [i64; 24] {
     for e in events {
         let mut t = e.start;
         while t < e.end {
-            let Some(dt) = Local.timestamp_opt(t, 0).single() else {
-                break;
+            // Ambiguous local times (DST fall-back: the same wall-clock hour
+            // twice) resolve to the first occurrence via `earliest()`; the
+            // old `single()` returned None there and `break`-ed, silently
+            // dropping the REST of the event.
+            let Some(dt) = Local.timestamp_opt(t, 0).earliest() else {
+                // Unrepresentable instant (out-of-range timestamp, not a
+                // real DST gap — real instants always map to a wall time):
+                // skip an hour of bucket-time instead of dropping the rest.
+                t += 3600;
+                continue;
             };
             let hour = dt.hour() as usize;
             let secs_left = 3600 - (dt.minute() as i64 * 60 + dt.second() as i64);
@@ -140,16 +148,28 @@ pub fn hourly(events: &[WindowEvent]) -> [i64; 24] {
 /// Split AFK-subtracted events into local days and aggregate each day.
 /// `from`/`to` are unix timestamps defining an inclusive-exclusive range.
 pub fn daily_usage(events: &[WindowEvent], from: i64, to: i64, rules: &RuleSet) -> Vec<DayUsage> {
-    let start_date = Local
+    // An unconvertible `from` (i64 extremes from a malformed request) used to
+    // fall back to 1970-01-01, making the day loop below iterate ~20k times
+    // over every event. Such a range has no representable days at all —
+    // return nothing instead.
+    let Some(start_date) = Local
         .timestamp_opt(from, 0)
         .single()
         .map(|d| d.date_naive())
-        .unwrap_or_else(|| NaiveDate::from_ymd_opt(1970, 1, 1).unwrap());
+    else {
+        return Vec::new();
+    };
+    // `to` falls back to `from`'s date only when unrepresentable (never for
+    // real timestamps). A valid but far-future `to` is capped at tomorrow:
+    // recorded usage can never be more than a day ahead (flush skew), and
+    // the cap bounds the day loop to a sane iteration count.
+    let horizon = Local::now().date_naive() + chrono::Duration::days(1);
     let end_date = Local
         .timestamp_opt(to.saturating_sub(1), 0)
         .single()
         .map(|d| d.date_naive())
-        .unwrap_or(start_date);
+        .unwrap_or(start_date)
+        .min(horizon);
 
     let mut days: Vec<DayUsage> = Vec::new();
     let mut cur = start_date;
@@ -270,7 +290,7 @@ mod tests {
 
     #[test]
     fn daily_usage_spans_days() {
-        let rules = RuleSet::compile(&default_rules()).unwrap();
+        let rules = RuleSet::compile(&default_rules());
         // One event spanning midnight local time.
         let midnight = Local::now().date_naive().and_hms_opt(23, 30, 0).unwrap();
         let start = Local
@@ -287,6 +307,29 @@ mod tests {
         let all_cats: Vec<&CategoryUsage> =
             days.iter().flat_map(|d| d.by_category.iter()).collect();
         assert!(all_cats.iter().any(|c| c.category == Category::Browsers));
+    }
+
+    #[test]
+    fn hourly_long_event_sums_exactly() {
+        // A 26-hour event must bucket to exactly 26h — guards against the
+        // old `break`-on-unconvertible behaviour dropping event tails.
+        let base = (Local::now().timestamp() / 3600) * 3600;
+        let events = vec![ev(base, base + 26 * 3600, "x")];
+        let h = hourly(&events);
+        assert_eq!(h.iter().sum::<i64>(), 26 * 3600);
+    }
+
+    #[test]
+    fn daily_usage_rejects_unconvertible_range() {
+        let rules = RuleSet::compile(&default_rules());
+        // i64::MIN has no representable local date — must return empty, not
+        // loop from 1970.
+        let days = daily_usage(&[ev(0, 10, "x")], i64::MIN, i64::MIN + 10, &rules);
+        assert!(days.is_empty());
+        // A "to" far in the future is capped at today: no 974k-day loop.
+        let far = Local::now().timestamp() + 86_400 * 100_000;
+        let days = daily_usage(&[ev(0, 10, "x")], 0, far, &rules);
+        assert!(days.len() < 40_000);
     }
 
     #[test]

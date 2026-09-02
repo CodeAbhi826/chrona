@@ -98,6 +98,22 @@ fn main() -> anyhow::Result<()> {
                 "org.freedesktop.ScreenSaver poll (15s)".to_string(),
             )
         }
+        watchers::SessionKind::GnomeWayland => {
+            // Same D-Bus intake as KDE: the Chrona GNOME Shell extension
+            // pushes window activations to org.chrona.Watcher.
+            #[cfg(feature = "dbus")]
+            idle::spawn_mutter_idle(tx.clone(), 60_000, 15);
+            #[cfg(not(feature = "dbus"))]
+            idle::spawn_dbus_screensaver(tx.clone(), 15);
+            (
+                "GNOME Wayland — Shell extension via D-Bus (install: docs/WATCHERS.md)".to_string(),
+                if cfg!(feature = "dbus") {
+                    "org.gnome.Mutter.IdleMonitor poll (60s threshold, 15s)".to_string()
+                } else {
+                    "org.freedesktop.ScreenSaver poll (15s)".to_string()
+                },
+            )
+        }
         watchers::SessionKind::WlrootsWayland => {
             let label = if watchers::wayland::spawn(tx.clone()).is_ok() {
                 "wlroots Wayland — wlr-foreign-toplevel + ext-idle-notify".to_string()

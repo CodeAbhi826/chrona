@@ -27,6 +27,11 @@ pub struct X11Watcher {
     last: Option<(String, String)>,
 }
 
+/// How often `_NET_ACTIVE_WINDOW` is polled. This MUST stay in sync with
+/// docs/WATCHERS.md ("EWMH polling (2 s resolution)") and the watcher label
+/// in main.rs — all three say 2 s. Do not tune one without the others.
+const POLL_INTERVAL: Duration = Duration::from_millis(2000);
+
 impl X11Watcher {
     pub fn connect() -> anyhow::Result<Self> {
         let (conn, screen_num) = RustConnection::connect(None)?;
@@ -121,7 +126,7 @@ impl X11Watcher {
                     }
                 }
             }
-            std::thread::sleep(Duration::from_millis(2000));
+            std::thread::sleep(POLL_INTERVAL);
         }
     }
 }

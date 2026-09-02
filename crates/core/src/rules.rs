@@ -75,13 +75,31 @@ pub struct RuleSet {
 }
 
 impl RuleSet {
-    pub fn compile(rules: &[Rule]) -> Result<Self, regex::Error> {
+    /// Compile a set of rules. This never fails: a rule whose pattern is not
+    /// a valid regex (unbalanced `(`, a stray `\`, …) falls back to a literal
+    /// (escaped) match instead of poisoning the whole ruleset — one bad rule
+    /// must never disable categorisation for everything else. Patterns that
+    /// already carry their own `^`/`$` anchors stay valid and equivalent inside
+    /// the non-capturing group.
+    pub fn compile(rules: &[Rule]) -> Self {
         let mut compiled = Vec::with_capacity(rules.len());
         for r in rules {
+            let re = match Regex::new(&format!("(?i)^(?:{})$", r.pattern)) {
+                Ok(re) => re,
+                Err(e) => {
+                    eprintln!(
+                        "[chrona] rule {:?} is not a valid regex ({e}); matching it as a literal",
+                        r.pattern
+                    );
+                    // Escaped literal: still a full, case-insensitive match.
+                    Regex::new(&format!("(?i)^{}$", regex::escape(&r.pattern)))
+                        .expect("escaped literal is always a valid regex")
+                }
+            };
             compiled.push(CompiledRule {
                 id: r.id,
                 pattern: r.pattern.clone(),
-                re: Regex::new(&format!("(?i)^({})$", r.pattern))?,
+                re,
                 field: r.field,
                 category: r.category,
                 priority: r.priority,
@@ -89,7 +107,7 @@ impl RuleSet {
         }
         // Highest priority first; ties keep insertion order (stable sort).
         compiled.sort_by_key(|r| std::cmp::Reverse(r.priority));
-        Ok(Self { rules: compiled })
+        Self { rules: compiled }
     }
 
     /// An empty ruleset — everything is uncategorised.
@@ -153,7 +171,7 @@ pub fn default_rules() -> Vec<Rule> {
 
     // Browsers (incl. common PWA host browsers)
     v.push(app(
-        "firefox|firefox-esr|librewolf|floorp|zen-beta|zen-alpha|chromium|chromium-browser|google-chrome|chrome|brave|brave-browser|vivaldi-stable|vivaldi|opera|epiphany|gnome-web|falkon|thorium-browser|appimagepool.*browser",
+        "firefox|firefox-esr|librewolf|floorp|zen|zen-beta|zen-alpha|chromium|chromium-browser|google-chrome|chrome|brave|brave-browser|vivaldi-stable|vivaldi|opera|epiphany|gnome-web|falkon|thorium-browser|appimagepool.*browser",
         Category::Browsers,
     ));
 
@@ -219,7 +237,7 @@ mod tests {
     use super::*;
 
     fn rs() -> RuleSet {
-        RuleSet::compile(&default_rules()).unwrap()
+        RuleSet::compile(&default_rules())
     }
 
     #[test]
@@ -260,8 +278,40 @@ mod tests {
         let mut rules = default_rules();
         // Terminal is System by default; the user wants it to be Work.
         rules.push(Rule::new("konsole|kitty", Field::App, Category::Work, 100));
-        let r = RuleSet::compile(&rules).unwrap();
+        let r = RuleSet::compile(&rules);
         assert_eq!(r.categorize("kitty", "zsh"), Category::Work);
+    }
+
+    #[test]
+    fn user_anchors_stay_valid() {
+        // A pattern that brings its own ^...$ anchors must not break the
+        // wrapping (audit issue: `^(^^firefox$$)` used to be produced by a
+        // capturing wrap; the (?:...) group keeps it valid and equivalent).
+        let rules = vec![Rule::new("^firefox$", Field::App, Category::Work, 100)];
+        let r = RuleSet::compile(&rules);
+        assert_eq!(r.categorize("firefox", "x"), Category::Work);
+        assert_eq!(r.categorize("firefoxx", "x"), Category::Uncategorised);
+    }
+
+    #[test]
+    fn invalid_regex_falls_back_to_literal() {
+        // Unbalanced parenthesis: invalid as a regex, valid as a literal.
+        let rules = vec![Rule::new("firefox(", Field::App, Category::Work, 100)];
+        let r = RuleSet::compile(&rules);
+        assert_eq!(r.categorize("firefox(", "x"), Category::Work);
+        assert_eq!(r.categorize("firefox", "x"), Category::Uncategorised);
+        // And one bad rule must not take down the rest of the ruleset.
+        let mut rules = default_rules();
+        rules.push(Rule::new("[bad", Field::App, Category::Gaming, 200));
+        let r = RuleSet::compile(&rules);
+        assert_eq!(r.categorize("firefox", "x"), Category::Browsers);
+    }
+
+    #[test]
+    fn zen_stable_browser_matches() {
+        let r = rs();
+        assert_eq!(r.categorize("zen", "x"), Category::Browsers);
+        assert_eq!(r.categorize("zen-beta", "x"), Category::Browsers);
     }
 
     #[test]

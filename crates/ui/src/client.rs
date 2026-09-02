@@ -89,9 +89,13 @@ pub fn socket_path() -> PathBuf {
 }
 
 /// One JSON-RPC-ish round trip to the daemon. Returns `data` on ok.
+/// Both directions carry timeouts: a wedged daemon (or a full socket
+/// buffer) must never freeze the UI thread for longer than 5 s.
 pub fn request(cmd: &str, args: Value) -> Option<Value> {
     let mut stream = UnixStream::connect(socket_path()).ok()?;
-    stream.set_read_timeout(Some(Duration::from_secs(5))).ok()?;
+    let timeout = Some(Duration::from_secs(5));
+    stream.set_read_timeout(timeout).ok()?;
+    stream.set_write_timeout(timeout).ok()?;
     let req = json!({"id": 1, "cmd": cmd, "args": args});
     writeln!(stream, "{req}").ok()?;
     stream.flush().ok()?;

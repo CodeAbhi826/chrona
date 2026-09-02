@@ -17,9 +17,11 @@ Usage:
 
 import argparse
 import json
+import os
 import random
 import socket as syssock
 import sqlite3
+import sys
 import time
 
 from seed import TITLES
@@ -86,7 +88,23 @@ def main():
     ap.add_argument("--db", required=True)
     ap.add_argument("--socket", required=True)
     ap.add_argument("--interval", type=float, default=5.0)
+    # The ticker writes FAKE events straight into SQLite, bypassing the
+    # daemon's state machine. Pointing it at a real chrona.db would poison
+    # genuine history — so refuse any path that does not scream "demo"
+    # unless the operator explicitly passes --force.
+    ap.add_argument(
+        "--force",
+        action="store_true",
+        help="allow running against a database whose path does not contain 'demo'",
+    )
     args = ap.parse_args()
+
+    if "demo" not in os.path.abspath(args.db).lower() and not args.force:
+        sys.exit(
+            f"refusing to write simulated events into {args.db} (path lacks 'demo')\n"
+            "the ticker fabricates window events directly in SQLite — use a dedicated demo\n"
+            "database path, or pass --force if you really know what you are doing"
+        )
 
     rng = random.Random()
     rpc = ChronaSock(args.socket)
@@ -111,6 +129,20 @@ def main():
     print("ticker running — feeding simulated window events")
     while True:
         now = int(time.time())
+        # Honour the daemon's pause switch: the state machine ignores real
+        # watcher events while paused, and fake ones must not sneak past it.
+        paused = False
+        pres = rpc.call("settings.get", {"key": "paused"})
+        if pres and pres.get("ok") and pres.get("data", {}).get("value") == "1":
+            paused = True
+        if paused:
+            if cur_id is not None:
+                conn.execute("UPDATE events SET end = ? WHERE id = ?", (now, cur_id))
+                conn.commit()
+                cur_id = None
+            rpc.call("settings.set", {"key": "demo.current_window", "value": "recording paused"})
+            time.sleep(args.interval)
+            continue
         if pending_start and now < pending_start:
             rpc.call("settings.set", {"key": "demo.current_window", "value": "AFK — away from keyboard"})
             time.sleep(args.interval)

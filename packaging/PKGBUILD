@@ -9,9 +9,12 @@ license=(MIT)
 depends=(gcc-libs)
 makedepends=(cargo)
 optdepends=(
-    "dbus: KWin script intake and screensaver-based idle detection"
+    "dbus: KWin script / GNOME extension intake and screensaver-based idle detection"
     "kwin: Chrona KWin script for Plasma Wayland window tracking"
+    "gnome-shell: Chrona extension for GNOME Wayland window tracking"
 )
+# No backup= entry on purpose: the user's data (~/.local/share/chrona/chrona.db)
+# is never installed into $pkgdir, so the package cannot remove it either.
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=(SKIP)
 
@@ -49,6 +52,10 @@ package() {
     # KWin watcher script, used by `chrona` (Settings page) and kwin/install.sh
     install -dm755 "$pkgdir/usr/share/chrona/kwin"
     cp -r kwin/chrona-watcher "$pkgdir/usr/share/chrona/kwin/"
+
+    # GNOME Shell extension, used by `chrona` (Settings page) and install.sh
+    install -dm755 "$pkgdir/usr/share/chrona/gnome"
+    cp -r gnome/chrona@chrona.local "$pkgdir/usr/share/chrona/gnome/"
 
     install -Dm644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname/"
 }

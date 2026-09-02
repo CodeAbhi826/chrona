@@ -31,13 +31,9 @@ pub struct Shared {
 
 impl Shared {
     pub fn new(store: Store) -> anyhow::Result<Self> {
-        let ruleset = match RuleSet::compile(&store.rules()?) {
-            Ok(rs) => Arc::new(rs),
-            Err(e) => {
-                eprintln!("[chronad] rules failed to compile ({e}); falling back to built-ins");
-                Arc::new(RuleSet::compile(&chrona_core::rules::default_rules()).unwrap())
-            }
-        };
+        // `compile` is infallible: invalid user patterns degrade to literal
+        // matches instead of disabling the whole ruleset.
+        let ruleset = Arc::new(RuleSet::compile(&store.rules()?));
         let paused = Arc::new(AtomicBool::new(
             store.setting("paused").ok().flatten().as_deref() == Some("1"),
         ));
@@ -62,11 +58,10 @@ impl Shared {
         Arc::clone(&self.ruleset.lock().unwrap())
     }
 
-    pub fn rebuild_ruleset(&self) -> anyhow::Result<()> {
-        let rules = self.store.rules()?;
-        let rs = Arc::new(RuleSet::compile(&rules)?);
+    pub fn rebuild_ruleset(&self) {
+        let rules = self.store.rules().unwrap_or_default();
+        let rs = Arc::new(RuleSet::compile(&rules));
         *self.ruleset.lock().unwrap() = rs;
-        Ok(())
     }
 
     pub fn set_watcher_label(&self, s: &str) {
@@ -130,7 +125,16 @@ fn dispatch(shared: &Shared, req: &Value) -> Value {
     match result {
         Ok(Ok(data)) => json!({"id": id, "ok": true, "data": data}),
         Ok(Err(e)) => json!({"id": id, "ok": false, "error": e.to_string()}),
-        Err(_) => json!({"id": id, "ok": false, "error": "internal error"}),
+        Err(panic) => {
+            // A panic payload is almost always a String or &str; surface it
+            // so failures are debuggable instead of a bare "internal error".
+            let detail = panic
+                .downcast_ref::<String>()
+                .map(|s| s.as_str())
+                .or_else(|| panic.downcast_ref::<&str>().copied())
+                .unwrap_or("unknown panic");
+            json!({"id": id, "ok": false, "error": format!("internal error: {detail}")})
+        }
     }
 }
 
@@ -240,7 +244,12 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
             Ok(p)
         }
         "week" => {
-            let offset = a.get("offset").and_then(Value::as_i64).unwrap_or(0);
+            // Sanity-clamped: weeks in the past (0 .. ~10 years).
+            let offset = a
+                .get("offset")
+                .and_then(Value::as_i64)
+                .unwrap_or(0)
+                .clamp(0, 520);
             let today = Local::now().date_naive();
             let monday = monday_of_week(today) - Duration::weeks(offset);
             let sunday = monday + Duration::days(6);
@@ -251,7 +260,12 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
             Ok(p)
         }
         "month" => {
-            let offset = a.get("offset").and_then(Value::as_i64).unwrap_or(0) as i32;
+            // Sanity-clamped: months in the past (0 .. ~200 years).
+            let offset = a
+                .get("offset")
+                .and_then(Value::as_i64)
+                .unwrap_or(0)
+                .clamp(0, 2400) as i32;
             let now = Local::now().date_naive();
             let (y, m) = month_shift(now.year(), now.month() as i32 - offset);
             let first = NaiveDate::from_ymd_opt(y, m as u32, 1).unwrap();
@@ -345,9 +359,14 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
                 pattern,
                 field,
                 category,
-                priority: a.get("priority").and_then(Value::as_i64).unwrap_or(100) as i32,
+                priority: a
+                    .get("priority")
+                    .and_then(Value::as_i64)
+                    .unwrap_or(100)
+                    // Sanity-clamped: keep user rules inside a usable range.
+                    .clamp(0, 100_000) as i32,
             })?;
-            sh.rebuild_ruleset()?;
+            sh.rebuild_ruleset();
             Ok(json!({"id": id}))
         }
         "rule.del" => {
@@ -356,7 +375,7 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
                 .and_then(Value::as_i64)
                 .ok_or_else(|| anyhow::anyhow!("id required"))?;
             sh.store.remove_rule(id)?;
-            sh.rebuild_ruleset()?;
+            sh.rebuild_ruleset();
             Ok(json!({"removed": id}))
         }
 
@@ -382,10 +401,25 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
             let limit = a
                 .get("limit_seconds")
                 .and_then(Value::as_i64)
-                .ok_or_else(|| anyhow::anyhow!("limit_seconds required"))?;
+                .ok_or_else(|| anyhow::anyhow!("limit_seconds required"))?
+                // Sanity-clamped: 1 minute .. 1 day (goals are per-day).
+                .clamp(60, 86_400);
             let enabled = a.get("enabled").and_then(Value::as_bool).unwrap_or(true);
             let id = sh.store.set_goal(&kind, &key, limit, enabled)?;
             Ok(json!({"id": id}))
+        }
+        "goal.toggle" => {
+            // Atomic single-row toggle — no read-modify-write race between
+            // the UI and other API clients.
+            let id = a
+                .get("id")
+                .and_then(Value::as_i64)
+                .ok_or_else(|| anyhow::anyhow!("id required"))?;
+            let enabled = sh
+                .store
+                .toggle_goal(id)?
+                .ok_or_else(|| anyhow::anyhow!("no goal with id {id}"))?;
+            Ok(json!({"id": id, "enabled": enabled}))
         }
         "goal.del" => {
             let id = a
