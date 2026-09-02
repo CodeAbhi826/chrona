@@ -19,7 +19,10 @@
 #             need the planned Shell extension)
 #
 # Usage:
-#   bash install.sh                # system install (uses sudo), latest release
+#   bash install.sh                # system install (uses sudo), latest release;
+#                                   from a repo checkout, a vX.Y.Z tag on HEAD
+#                                   is preferred over "latest" (waits for CI
+#                                   if the tag was pushed seconds ago)
 #   bash install.sh v0.2.2         # pin a specific release
 #   bash install.sh --user         # no-root install into ~/.local
 #
@@ -144,13 +147,34 @@ fi
 raw() { echo "https://raw.githubusercontent.com/$REPO/main/$1"; }
 
 # --------------------------------------------------------------- release ------
+# Which release to install:
+#   1. a pinned argument (bash install.sh v0.2.2) always wins
+#   2. a vX.Y.Z tag on HEAD of a repo checkout — the natural target when the
+#      installer is run right after tagging: /releases/latest still points at
+#      the PREVIOUS version while CI builds the new one, so a bare "latest"
+#      run would silently install the old release (used only when the tag is
+#      not older than latest, so a stale checkout still gets the newest)
+#   3. the latest release
 GH_TAG=""
 if [ -z "$TAG" ]; then
+    HEAD_TAG=""
+    if [ -n "$REPO_DIR" ] && command -v git >/dev/null 2>&1; then
+        HEAD_TAG="$(git -C "$REPO_DIR" tag --points-at HEAD 2>/dev/null \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)"
+    fi
+    LATEST=""
     log "finding the latest release"
-    [ "$DL" = gh ] && { TAG="$(gh release view -R "$REPO" --json tagName -q .tagName 2>/dev/null || true)"; }
-    if [ -z "$TAG" ] && [ "$DL" = curl ]; then
-        TAG="$(curl -sIL -o /dev/null -w '%{url_effective}' \
+    [ "$DL" = gh ] && { LATEST="$(gh release view -R "$REPO" --json tagName -q .tagName 2>/dev/null || true)"; }
+    if [ -z "$LATEST" ] && [ "$DL" = curl ]; then
+        LATEST="$(curl -sIL -o /dev/null -w '%{url_effective}' \
             "https://github.com/$REPO/releases/latest" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || true)"
+    fi
+    if [ -n "$HEAD_TAG" ] && { [ -z "$LATEST" ] || [ "$LATEST" = "$HEAD_TAG" ] \
+            || [ "$(printf '%s\n' "${LATEST#v}" "${HEAD_TAG#v}" | sort -V | tail -1)" = "${HEAD_TAG#v}" ]; }; then
+        log "checkout is tagged $HEAD_TAG — installing that release"
+        TAG="$HEAD_TAG"
+    else
+        TAG="$LATEST"
     fi
     [ -n "$TAG" ] || die "cannot auto-detect the latest release — pass a version: bash install.sh vX.Y.Z"
 fi
