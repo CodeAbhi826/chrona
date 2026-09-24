@@ -46,6 +46,7 @@ package() {
     install -Dm644 assets/icon-128.png "$pkgdir/usr/share/icons/hicolor/128x128/apps/chrona.png"
     install -Dm644 assets/icon-256.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/chrona.png"
     install -Dm644 assets/icon-512.png "$pkgdir/usr/share/icons/hicolor/512x512/apps/chrona.png"
+    install -Dm644 packaging/io.github.CodeAbhi826.chrona.metainfo.xml "$pkgdir/usr/share/metainfo/io.github.CodeAbhi826.chrona.metainfo.xml"
 
     # KWin watcher script
     install -dm755 "$pkgdir/usr/share/chrona/kwin"

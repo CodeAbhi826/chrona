@@ -24,6 +24,9 @@ finish-args:
   # Local data directory for SQLite database
   - --filesystem=xdg-data/chrona:create
 
+  # Chrona daemon IPC socket (running on host user session)
+  - --filesystem=xdg-run/chrona.sock
+
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin
   env:
@@ -36,6 +39,7 @@ modules:
       - cargo build --release --locked --workspace
       - install -Dm755 target/release/chrona /app/bin/chrona
       - install -Dm755 target/release/chronad /app/bin/chronad
+      - sed -i 's/^Icon=chrona/Icon=io.github.CodeAbhi826.chrona/' packaging/chrona.desktop
       - install -Dm644 packaging/chrona.desktop /app/share/applications/io.github.CodeAbhi826.chrona.desktop
       - install -Dm644 assets/icon.svg /app/share/icons/hicolor/scalable/apps/io.github.CodeAbhi826.chrona.svg
       - install -Dm644 assets/icon-128.png /app/share/icons/hicolor/128x128/apps/io.github.CodeAbhi826.chrona.png

@@ -102,7 +102,7 @@ export component SettingsView inherits Rectangle {
                         clicked => { root.do-export(); }
                     }
                     Text {
-                        text: root.export-path != "" ? ("Saved to " + root.export-path) : "All recorded data, one JSON file.";
+                        text: root.export-path != "" ? root.export-path : "All recorded data, one JSON file.";
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Theme.text-dim;
@@ -115,7 +115,7 @@ export component SettingsView inherits Rectangle {
                 VerticalLayout {
                     spacing: 4px;
                     Text { text: "Chrona " + root.version-line; font-size: 13px; color: Theme.text; }
-                    Text { text: "Digital wellbeing for every Linux desktop. MIT licensed. github.com/chrona-linux/chrona"; font-size: 12px; color: Theme.text-dim; wrap: word-wrap; }
+                    Text { text: "Digital wellbeing for every Linux desktop. MIT licensed. github.com/CodeAbhi826/chrona"; font-size: 12px; color: Theme.text-dim; wrap: word-wrap; }
                 }
             }
         }

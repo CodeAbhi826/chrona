@@ -69,7 +69,8 @@ pub fn spawn(shared: Arc<Shared>) {
                 let usage = api::today_usage_map(&shared);
                 let date = Local::now().format("%Y-%m-%d").to_string();
                 for g in goals.iter().filter(|g| g.enabled && g.limit_seconds > 0) {
-                    let Some(used) = usage.get(&format!("{}:{}", g.kind, g.key)) else {
+                    let map_key = api::goal_map_key(g);
+                    let Some(used) = usage.get(&map_key) else {
                         continue;
                     };
                     let over = *used > g.limit_seconds;

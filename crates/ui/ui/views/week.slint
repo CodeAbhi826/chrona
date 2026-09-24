@@ -34,7 +34,7 @@ export component WeekView inherits Rectangle {
                         Text {
                             text: root.delta-text;
                             font-size: 13px;
-                            color: root.delta-up ? Theme.danger : Theme.ok;
+                            color: root.delta-text == "first tracked week" ? Theme.text-dim : (root.delta-up ? Theme.danger : Theme.ok);
                         }
                     }
                     preferred-width: 280px;

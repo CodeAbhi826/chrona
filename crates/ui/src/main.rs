@@ -164,10 +164,15 @@ fn main() -> Result<(), slint::PlatformError> {
     {
         let _weak = app.as_weak();
         app.on_add_goal(move |kind, key, minutes| {
-            let limit = (minutes.max(1.0) * 60.0) as i64;
+            let kind_str = kind.as_str().trim();
+            let key_str = key.as_str().trim();
+            if minutes < 1.0 || (kind_str != "total" && key_str.is_empty()) {
+                return;
+            }
+            let limit = (minutes * 60.0) as i64;
             let _ = client::request(
                 "goal.set",
-                json!({"kind": kind.to_string(), "key": key.to_string(), "limit_seconds": limit, "enabled": true}),
+                json!({"kind": kind_str, "key": key_str, "limit_seconds": limit, "enabled": true}),
             );
             REFRESH.store(true, Ordering::SeqCst);
         });
@@ -203,6 +208,10 @@ fn main() -> Result<(), slint::PlatformError> {
         let weak = app.as_weak();
         app.on_dismiss_app_paused(move || {
             if let Some(app) = weak.upgrade() {
+                let id = app.get_app_paused_id().to_string();
+                if !id.is_empty() {
+                    *client::DISMISSED_APP.lock().unwrap() = Some(id);
+                }
                 app.set_app_paused_visible(false);
             }
         });
@@ -270,7 +279,11 @@ fn main() -> Result<(), slint::PlatformError> {
 /// All helper processes are invoked with explicit argv — never through a
 /// shell — so a hostile `src` path can never inject commands.
 fn install_kwin_script() -> String {
+    let home_share = std::env::var("HOME")
+        .map(|h| std::path::PathBuf::from(h).join(".local/share/chrona/kwin/chrona-watcher"))
+        .unwrap_or_else(|_| std::path::PathBuf::from("/nonexistent"));
     let candidates = [
+        home_share,
         std::path::PathBuf::from("/usr/share/chrona/kwin/chrona-watcher"),
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../kwin/chrona-watcher")
@@ -371,7 +384,11 @@ fn install_kwin_script() -> String {
 /// `gnome-extensions enable` cannot see it yet, the user logs out/in once.
 fn install_gnome_extension() -> String {
     const UUID: &str = "chrona@chrona.local";
+    let home_share = std::env::var("HOME")
+        .map(|h| std::path::PathBuf::from(h).join(".local/share/chrona/gnome").join(UUID))
+        .unwrap_or_else(|_| std::path::PathBuf::from("/nonexistent"));
     let candidates = [
+        home_share,
         std::path::PathBuf::from("/usr/share/chrona/gnome").join(UUID),
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../gnome")
@@ -428,7 +445,7 @@ fn copy_dir(src: &std::path::Path, dest: &std::path::Path) -> std::io::Result<()
 
 fn export_json() -> String {
     let Some(data) = client::request("export", json!({})) else {
-        return "daemon offline".into();
+        return "Export failed: daemon offline".into();
     };
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     let path = format!(
@@ -437,13 +454,13 @@ fn export_json() -> String {
         chrono::Local::now().format("%Y%m%d-%H%M%S")
     );
     let Ok(mut f) = std::fs::File::create(&path) else {
-        return format!("cannot write {path}");
+        return format!("Export failed: cannot write {path}");
     };
     match serde_json::to_string_pretty(&data) {
         Ok(s) => {
             let _ = f.write_all(s.as_bytes());
-            path
+            format!("Saved to {path}")
         }
-        Err(e) => format!("export failed: {e}"),
+        Err(e) => format!("Export failed: {e}"),
     }
 }

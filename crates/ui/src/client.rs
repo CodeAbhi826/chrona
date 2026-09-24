@@ -45,6 +45,7 @@ pub struct MetaInfo {
     pub pwa: bool,
 }
 static META: Mutex<Vec<(String, MetaInfo)>> = Mutex::new(Vec::new());
+pub static DISMISSED_APP: Mutex<Option<String>> = Mutex::new(None);
 
 fn meta_of(app_id: &str) -> Option<MetaInfo> {
     META.lock()
@@ -441,6 +442,14 @@ fn build_heatmap(days: &[Value]) -> Vec<WeekColumn> {
         }
     }
     if !column.is_empty() {
+        while column.len() < 7 {
+            column.push(HeatCell {
+                v: -1.0,
+                label: sstr(""),
+                tip: sstr(""),
+                is_today: false,
+            });
+        }
         weeks.push(WeekColumn { cells: rc(column) });
     }
     weeks
@@ -490,6 +499,8 @@ pub fn tick(app: &ChronaApp) {
         let a = cw.get("app_id").and_then(Value::as_str).unwrap_or("");
         app.set_status_current(sstr(if !w.is_empty() {
             format!("{} — {}", pretty_name(a), w)
+        } else if !a.is_empty() {
+            pretty_name(a)
         } else {
             String::new()
         }));
@@ -515,6 +526,13 @@ pub fn tick(app: &ChronaApp) {
     // ---- app identity (names/icons from .desktop entries) ----
     {
         let mut ids: Vec<String> = Vec::new();
+        if let Some(cw) = status.get("current_window") {
+            if let Some(id) = cw.get("app_id").and_then(Value::as_str) {
+                if !id.is_empty() && id != "chrona" {
+                    ids.push(id.to_string());
+                }
+            }
+        }
         for p in [&day, &week, &month].into_iter().flatten() {
             for a in arr(p, "apps") {
                 if let Some(id) = a.get("app_id").and_then(Value::as_str) {
@@ -563,7 +581,7 @@ pub fn tick(app: &ChronaApp) {
         app.set_week_total_text(sstr(fmt_dur(total)));
         app.set_week_avg_text(sstr(format!("{} average per day", fmt_dur(total / 7))));
         let delta = total - prev;
-        app.set_week_delta_up(delta > 0);
+        app.set_week_delta_up(prev > 0 && delta > 0);
         app.set_week_delta_text(sstr(if prev > 0 {
             format!(
                 "{}{} vs last week",
@@ -713,6 +731,21 @@ pub fn tick(app: &ChronaApp) {
         // Digital Wellbeing: App Paused modal check
         if let Some(cw) = status.get("current_window") {
             if let Some(curr_app) = cw.get("app_id").and_then(Value::as_str) {
+                // Clear dismissal if user moved away to a different app
+                let is_dismissed = {
+                    let mut lock = DISMISSED_APP.lock().unwrap();
+                    if let Some(ref d) = *lock {
+                        if d != curr_app {
+                            *lock = None;
+                            false
+                        } else {
+                            true
+                        }
+                    } else {
+                        false
+                    }
+                };
+
                 if curr_app != "chrona" {
                     if let Some(_exceeded) = v.iter().find(|g| {
                         g.enabled
@@ -720,18 +753,25 @@ pub fn tick(app: &ChronaApp) {
                             && g.kind.as_str() == "app"
                             && g.key.as_str() == curr_app
                     }) {
-                        let name = pretty_name(curr_app);
-                        let icon_opt = meta_of(curr_app).and_then(|m| m.icon);
-                        app.set_app_paused_id(sstr(curr_app));
-                        app.set_app_paused_name(sstr(name));
-                        let has_icon = icon_opt.is_some();
-                        app.set_app_paused_has_icon(has_icon);
-                        if has_icon {
-                            app.set_app_paused_icon(load_icon(icon_opt.as_deref()));
-                        }
-                        if !app.get_app_paused_visible() {
-                            app.set_app_paused_visible(true);
-                            app.window().show().ok();
+                        if !is_dismissed {
+                            let meta = meta_of(curr_app);
+                            let name = meta
+                                .as_ref()
+                                .map(|m| m.name.clone())
+                                .filter(|n| !n.is_empty())
+                                .unwrap_or_else(|| pretty_name(curr_app));
+                            let icon_opt = meta.and_then(|m| m.icon);
+                            app.set_app_paused_id(sstr(curr_app));
+                            app.set_app_paused_name(sstr(name));
+                            let has_icon = icon_opt.is_some();
+                            app.set_app_paused_has_icon(has_icon);
+                            if has_icon {
+                                app.set_app_paused_icon(load_icon(icon_opt.as_deref()));
+                            }
+                            if !app.get_app_paused_visible() {
+                                app.set_app_paused_visible(true);
+                                app.window().show().ok();
+                            }
                         }
                     } else if app.get_app_paused_visible()
                         && app.get_app_paused_id().as_str() != curr_app

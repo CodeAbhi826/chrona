@@ -98,12 +98,13 @@ export component GoalsView inherits Rectangle {
                         current-value: "category";
                         selected(value) => {
                             root.kind-changed(value);
-                            key-input.current-value = "";
+                            key-input.current-value = root.suggestions[0];
                         }
                     }
                     key-input := ComboBox {
                         width: 200px;
                         model: root.suggestions;
+                        current-value: root.suggestions[0];
                         enabled: kind-input.current-value != "total";
                     }
                     mins-input := LineEdit {
@@ -114,9 +115,12 @@ export component GoalsView inherits Rectangle {
                     Button {
                         text: "Add limit";
                         clicked => {
-                            root.add-goal(kind-input.current-value,
-                                          key-input.current-value,
-                                          mins-input.text.to-float());
+                            if mins-input.text.to-float() >= 1.0 && (kind-input.current-value == "total" || key-input.current-value != "") {
+                                root.add-goal(kind-input.current-value,
+                                              key-input.current-value,
+                                              mins-input.text.to-float());
+                                mins-input.text = "";
+                            }
                         }
                     }
                 }

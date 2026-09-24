@@ -77,6 +77,10 @@ jobs:
           mkdir -p dist
           cp target/release/chrona target/release/chronad dist/
           cp README.md LICENSE dist/
+          cp -r assets dist/
+          cp -r kwin dist/
+          cp -r gnome dist/
+          cp -r packaging dist/
           cd dist && tar czf ../chrona-${{ github.ref_name }}-x86_64-linux-gnu.tar.gz .
 
       - name: GitHub Release

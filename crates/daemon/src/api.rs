@@ -396,7 +396,11 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
             let key = if kind == "total" {
                 "total".to_string()
             } else {
-                str_arg(a, "key")?
+                let k = str_arg(a, "key")?;
+                if k.trim().is_empty() {
+                    anyhow::bail!("key required for kind {kind}");
+                }
+                k
             };
             let limit = a
                 .get("limit_seconds")
@@ -604,7 +608,7 @@ pub(crate) fn today_usage_map(sh: &Shared) -> std::collections::HashMap<String, 
     map
 }
 
-fn goal_map_key(g: &Goal) -> String {
+pub(crate) fn goal_map_key(g: &Goal) -> String {
     if g.kind == "total" {
         // "total:total" — matches the key produced by today_usage_map.
         format!(
