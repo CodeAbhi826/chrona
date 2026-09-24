@@ -308,17 +308,26 @@ impl Store {
     }
 
     /// Add extra seconds to a goal limit (e.g. "+5 minutes" extension).
-    pub fn extend_goal(&self, key: &str, extra_seconds: i64) -> anyhow::Result<Option<i64>> {
+    /// Ensures `new_limit = (cur_limit.max(current_used) + extra_seconds)` so
+    /// a user who has already exceeded their budget by more than `extra_seconds`
+    /// is guaranteed a full extra window from this moment.
+    pub fn extend_goal(
+        &self,
+        kind: &str,
+        key: &str,
+        extra_seconds: i64,
+        current_used: i64,
+    ) -> anyhow::Result<Option<i64>> {
         let conn = self.conn.lock().unwrap();
         let row: Option<(i64, i64)> = conn
             .query_row(
-                "SELECT id, limit_seconds FROM goals WHERE key = ?1 AND kind = 'app'",
-                params![key],
+                "SELECT id, limit_seconds FROM goals WHERE key = ?1 AND kind = ?2",
+                params![key, kind],
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .optional()?;
         if let Some((id, cur_limit)) = row {
-            let new_limit = cur_limit + extra_seconds;
+            let new_limit = (cur_limit.max(current_used) + extra_seconds).clamp(60, 86_400);
             conn.execute(
                 "UPDATE goals SET limit_seconds = ?1 WHERE id = ?2",
                 params![new_limit, id],
@@ -451,6 +460,19 @@ mod tests {
         assert_eq!(s.toggle_goal(id).unwrap(), Some(true));
         // Unknown id: no row touched, reported as None.
         assert_eq!(s.toggle_goal(9999).unwrap(), None);
+    }
+
+    #[test]
+    fn goal_extension_adds_from_current_usage() {
+        let s = tmp_store("extend");
+        let id = s.set_goal("category", "browsers", 1800, true).unwrap();
+        // Usage at 2000s (> 1800s limit). Extending by 300s gives 2000 + 300 = 2300s.
+        let updated = s
+            .extend_goal("category", "browsers", 300, 2000)
+            .unwrap();
+        assert_eq!(updated, Some(id));
+        let goals = s.goals().unwrap();
+        assert_eq!(goals[0].limit_seconds, 2300);
     }
 
     #[test]

@@ -170,6 +170,7 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
         "ping" => Ok(json!({"pong": true})),
         "status" => {
             let t = sh.tracker.lock().unwrap();
+            let rules = sh.ruleset();
             Ok(json!({
                 "version": env!("CARGO_PKG_VERSION"),
                 "uptime_seconds": sh.started.elapsed().as_secs(),
@@ -177,10 +178,13 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
                 "idle_provider": *sh.idle_provider.lock().unwrap(),
                 "recording": !t.is_afk(),
                 "afk": t.is_afk(),
-                "current_window": t.current_window().map(|(app, title)| json!({"app_id": app, "title": title})),
+                "current_window": t.current_window().map(|(app, title)| {
+                    let cat = rules.categorize(&app, &title).key();
+                    json!({"app_id": app, "title": title, "category": cat})
+                }),
                 "db_path": sh.store.path().display().to_string(),
                 "socket": default_socket_path().display().to_string(),
-                "rules": sh.ruleset().len(),
+                "rules": rules.len(),
                 "paused": sh.paused.load(Ordering::Relaxed),
             }))
         }
@@ -435,12 +439,22 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
         }
         "goal.extend" => {
             let key = str_arg(a, "key")?;
+            let kind = a.get("kind").and_then(Value::as_str).unwrap_or("app");
             let seconds = a
                 .get("seconds")
                 .and_then(Value::as_i64)
                 .unwrap_or(300)
                 .clamp(60, 3600);
-            let id = sh.store.extend_goal(&key, seconds)?;
+            let today = today_usage_map(sh);
+            let map_key = if kind == "total" {
+                "total:total".to_string()
+            } else {
+                format!("{kind}:{key}")
+            };
+            let current_used = today.get(&map_key).copied().unwrap_or(0);
+            let id = sh
+                .store
+                .extend_goal(kind, &key, seconds, current_used)?;
             Ok(json!({"id": id, "extended_seconds": seconds}))
         }
 

@@ -87,7 +87,9 @@ export component ChronaApp inherits Window {
     in-out property <image> app-paused-icon;
     in-out property <bool> app-paused-has-icon: false;
     in-out property <string> app-paused-id: "";
-    callback extend-app-limit(string);
+    in-out property <string> app-paused-kind: "app";
+    in-out property <string> app-paused-app: "";
+    callback extend-app-limit(string, string);
     callback dismiss-app-paused();
 
     title: "Chrona";
@@ -357,7 +359,7 @@ export component ChronaApp inherits Window {
                     padding-top: 10px;
                     Button {
                         text: "Use for 5 minutes";
-                        clicked => { root.extend-app-limit(root.app-paused-id); }
+                        clicked => { root.extend-app-limit(root.app-paused-kind, root.app-paused-id); }
                     }
                     Button {
                         text: "OK";

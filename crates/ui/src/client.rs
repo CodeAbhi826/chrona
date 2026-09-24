@@ -731,6 +731,7 @@ pub fn tick(app: &ChronaApp) {
         // Digital Wellbeing: App Paused modal check
         if let Some(cw) = status.get("current_window") {
             if let Some(curr_app) = cw.get("app_id").and_then(Value::as_str) {
+                let curr_cat = cw.get("category").and_then(Value::as_str).unwrap_or("");
                 // Clear dismissal if user moved away to a different app
                 let is_dismissed = {
                     let mut lock = DISMISSED_APP.lock().unwrap();
@@ -747,22 +748,45 @@ pub fn tick(app: &ChronaApp) {
                 };
 
                 if curr_app != "chrona" {
-                    if let Some(_exceeded) = v.iter().find(|g| {
-                        g.enabled
-                            && g.exceeded
-                            && g.kind.as_str() == "app"
-                            && g.key.as_str() == curr_app
-                    }) {
+                    // Check app-specific limit first, then category limit
+                    let exceeded_goal = v
+                        .iter()
+                        .find(|g| {
+                            g.enabled
+                                && g.exceeded
+                                && g.kind.as_str() == "app"
+                                && g.key.as_str() == curr_app
+                        })
+                        .or_else(|| {
+                            v.iter().find(|g| {
+                                g.enabled
+                                    && g.exceeded
+                                    && g.kind.as_str() == "category"
+                                    && g.key.as_str() == curr_cat
+                            })
+                        });
+
+                    if let Some(exceeded) = exceeded_goal {
                         if !is_dismissed {
+                            let is_cat = exceeded.kind.as_str() == "category";
                             let meta = meta_of(curr_app);
-                            let name = meta
+                            let app_name = meta
                                 .as_ref()
                                 .map(|m| m.name.clone())
                                 .filter(|n| !n.is_empty())
                                 .unwrap_or_else(|| pretty_name(curr_app));
                             let icon_opt = meta.and_then(|m| m.icon);
-                            app.set_app_paused_id(sstr(curr_app));
-                            app.set_app_paused_name(sstr(name));
+
+                            let target_name = if is_cat {
+                                format!("{app_name} ({})", chrona_label(exceeded.key.as_str()))
+                            } else {
+                                app_name
+                            };
+
+                            app.set_app_paused_kind(sstr(exceeded.kind.as_str()));
+                            app.set_app_paused_id(sstr(exceeded.key.as_str()));
+                            app.set_app_paused_app(sstr(curr_app));
+                            app.set_app_paused_name(sstr(target_name));
                             let has_icon = icon_opt.is_some();
                             app.set_app_paused_has_icon(has_icon);
                             if has_icon {
@@ -774,7 +798,7 @@ pub fn tick(app: &ChronaApp) {
                             }
                         }
                     } else if app.get_app_paused_visible()
-                        && app.get_app_paused_id().as_str() != curr_app
+                        && app.get_app_paused_app().as_str() != curr_app
                     {
                         app.set_app_paused_visible(false);
                     }

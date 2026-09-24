@@ -208,9 +208,9 @@ fn main() -> Result<(), slint::PlatformError> {
         let weak = app.as_weak();
         app.on_dismiss_app_paused(move || {
             if let Some(app) = weak.upgrade() {
-                let id = app.get_app_paused_id().to_string();
-                if !id.is_empty() {
-                    *client::DISMISSED_APP.lock().unwrap() = Some(id);
+                let app_id = app.get_app_paused_app().to_string();
+                if !app_id.is_empty() {
+                    *client::DISMISSED_APP.lock().unwrap() = Some(app_id);
                 }
                 app.set_app_paused_visible(false);
             }
@@ -218,10 +218,13 @@ fn main() -> Result<(), slint::PlatformError> {
     }
     {
         let weak = app.as_weak();
-        app.on_extend_app_limit(move |id| {
+        app.on_extend_app_limit(move |kind, id| {
             if let Some(app) = weak.upgrade() {
                 app.set_app_paused_visible(false);
-                let _ = client::request("goal.extend", json!({"key": id.as_str(), "seconds": 300}));
+                let _ = client::request(
+                    "goal.extend",
+                    json!({"kind": kind.as_str(), "key": id.as_str(), "seconds": 300}),
+                );
                 REFRESH.store(true, Ordering::SeqCst);
             }
         });
