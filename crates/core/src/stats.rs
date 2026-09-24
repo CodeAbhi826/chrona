@@ -274,12 +274,16 @@ mod tests {
 
     #[test]
     fn hourly_buckets_a_two_hour_event() {
-        // Use a fixed UTC-ish base via Local — pick an arbitrary timestamp and
-        // compute its local hour so the test is timezone-independent.
-        let base = Local::now().timestamp();
-        let base_hour = Local.timestamp_opt(base, 0).single().unwrap().hour() as i64;
-        // Build an event exactly aligned to the start of `base_hour`.
-        let aligned = base - (base % 3600);
+        // Construct a timestamp aligned to the start of the current local hour,
+        // so the test passes in all timezones (including fractional offsets like IST/UTC+5:30).
+        let now = Local::now();
+        let aligned_dt = now.date_naive().and_hms_opt(now.hour(), 0, 0).unwrap();
+        let aligned = Local
+            .from_local_datetime(&aligned_dt)
+            .earliest()
+            .unwrap()
+            .timestamp();
+        let base_hour = now.hour() as i64;
         let events = vec![ev(aligned, aligned + 7200, "x")]; // two full hours
         let h = hourly(&events);
         let total: i64 = h.iter().sum();

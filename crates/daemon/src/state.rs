@@ -68,9 +68,16 @@ impl Tracker {
                 if !same {
                     self.close_current(store, now);
                     let e = WindowEvent::new(now, now, app.clone(), title.clone());
-                    let id = store.insert_event(&e).unwrap_or(-1);
-                    self.cur = Some((id, e));
-                    self.last_window = Some((app, title));
+                    match store.insert_event(&e) {
+                        Ok(id) => {
+                            self.cur = Some((id, e));
+                            self.last_window = Some((app, title));
+                        }
+                        Err(err) => {
+                            eprintln!("[chronad] failed to insert window event: {err}");
+                            self.cur = None;
+                        }
+                    }
                 }
             }
             Event::IdleStart => {
@@ -83,8 +90,13 @@ impl Tracker {
                         start: now,
                         end: now,
                     };
-                    let id = store.insert_afk(&a).unwrap_or(-1);
-                    self.afk = Some((id, a));
+                    match store.insert_afk(&a) {
+                        Ok(id) => self.afk = Some((id, a)),
+                        Err(err) => {
+                            eprintln!("[chronad] failed to insert afk session: {err}");
+                            self.afk = None;
+                        }
+                    }
                 }
             }
             Event::IdleEnd => {

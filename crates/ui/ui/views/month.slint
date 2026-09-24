@@ -34,30 +34,32 @@ export component MonthView inherits Rectangle {
                 Card {
                     title: "Usage calendar";
                     vertical-stretch: 1;
-                    Rectangle {
-                        height: 190px;
-                        HorizontalLayout {
-                            spacing: 6px;
-                            alignment: start;
-                            for w in root.weeks: Rectangle {
-                                width: 26px;
-                                height: 100%;
-                                VerticalLayout {
-                                    spacing: 6px;
-                                    for c in w.cells: Rectangle {
-                                        height: 22px;
-                                        border-radius: 6px;
-                                        background: c.v > 0
-                                            ? Theme.accent.with-alpha(0.12 + 0.88 * min(1, c.v))
-                                            : Theme.surface-2;
-                                        border-width: c.is-today ? 2px : 0px;
-                                        border-color: Theme.accent;
+                    VerticalLayout {
+                        spacing: 8px;
+                        Rectangle {
+                            height: 190px;
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: start;
+                                for w in root.weeks: Rectangle {
+                                    width: 26px;
+                                    height: 100%;
+                                    VerticalLayout {
+                                        spacing: 6px;
+                                        for c in w.cells: Rectangle {
+                                            height: 22px;
+                                            border-radius: 6px;
+                                            background: c.v > 0
+                                                ? Theme.accent.with-alpha(0.12 + 0.88 * min(1, c.v))
+                                                : Theme.surface-2;
+                                            border-width: c.is-today ? 2px : 0px;
+                                            border-color: Theme.accent;
+                                        }
                                     }
                                 }
                             }
                         }
                         Text {
-                            y: parent.height - 18px;
                             text: "darker = more screen time";
                             font-size: 10.5px;
                             color: Theme.text-dim;

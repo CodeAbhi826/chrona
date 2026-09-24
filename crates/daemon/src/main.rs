@@ -28,9 +28,17 @@ extern "C" fn on_signal(_sig: libc::c_int) {
 
 fn install_signal_handlers() {
     unsafe {
-        libc::signal(libc::SIGTERM, on_signal as *const () as usize);
-        libc::signal(libc::SIGINT, on_signal as *const () as usize);
-        libc::signal(libc::SIGHUP, libc::SIG_IGN);
+        let mut sa: libc::sigaction = std::mem::zeroed();
+        sa.sa_sigaction = on_signal as *const () as usize;
+        libc::sigemptyset(&mut sa.sa_mask);
+        sa.sa_flags = libc::SA_RESTART;
+        libc::sigaction(libc::SIGTERM, &sa, std::ptr::null_mut());
+        libc::sigaction(libc::SIGINT, &sa, std::ptr::null_mut());
+
+        let mut sa_ign: libc::sigaction = std::mem::zeroed();
+        sa_ign.sa_sigaction = libc::SIG_IGN;
+        libc::sigemptyset(&mut sa_ign.sa_mask);
+        libc::sigaction(libc::SIGHUP, &sa_ign, std::ptr::null_mut());
     }
 }
 

@@ -24,7 +24,8 @@ use wayland_protocols_wlr::foreign_toplevel::v1::client::zwlr_foreign_toplevel_m
 
 /// wlr-foreign-toplevel state flags (from the protocol XML):
 /// maximized=0, minimized=1, activated=2, fullscreen=3.
-const STATE_ACTIVATED: u8 = 2;
+/// These are u32 enum values sent as a wl_array on the wire.
+const STATE_ACTIVATED: u32 = 2;
 
 /// Per-toplevel info, updated from handle events.
 #[derive(Default)]
@@ -166,7 +167,9 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for App {
                 }
             }
             zwlr_foreign_toplevel_handle_v1::Event::State { state: states } => {
-                let activated = states.contains(&STATE_ACTIVATED);
+                let activated = states
+                    .chunks_exact(4)
+                    .any(|chunk| u32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) == STATE_ACTIVATED);
                 if activated {
                     state.activated = Some(id.clone());
                     state.report_activated();

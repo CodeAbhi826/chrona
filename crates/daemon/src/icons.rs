@@ -224,13 +224,15 @@ impl AppIndex {
             })
         };
         try_keys(&key).or_else(|| {
-            // Reverse-DNS tail: "org.telegram.desktop" → "telegram"?
-            // Only for ids with >= 3 dots, never the literal "desktop".
-            if key.matches('.').count() >= 3 {
-                key.rsplit('.').next().and_then(try_keys)
-            } else {
-                None
+            // Reverse-DNS tail: e.g. "org.telegram.desktop" -> "telegram", "org.gnome.Nautilus" -> "nautilus"
+            let stripped = key.strip_suffix(".desktop").unwrap_or(&key);
+            if stripped.contains('.') {
+                let tail = stripped.rsplit('.').next()?;
+                if !tail.is_empty() && tail != "desktop" {
+                    return try_keys(tail);
+                }
             }
+            None
         })
     }
 
