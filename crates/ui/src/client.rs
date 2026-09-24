@@ -724,9 +724,10 @@ pub fn tick(app: &ChronaApp) {
                         let icon_opt = meta_of(curr_app).and_then(|m| m.icon);
                         app.set_app_paused_id(sstr(curr_app));
                         app.set_app_paused_name(sstr(name));
-                        app.set_app_paused_has_icon(icon_opt.is_some());
-                        if let Some(ic) = icon_opt {
-                            app.set_app_paused_icon(ic);
+                        let has_icon = icon_opt.is_some();
+                        app.set_app_paused_has_icon(has_icon);
+                        if has_icon {
+                            app.set_app_paused_icon(load_icon(icon_opt.as_deref()));
                         }
                         if !app.get_app_paused_visible() {
                             app.set_app_paused_visible(true);
