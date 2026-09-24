@@ -137,23 +137,29 @@ export component ChronaApp inherits Window {
                     }
                 }
                 Rectangle { horizontal-stretch: 1; }
-                // recording chip
+                // running status chip
                 Rectangle {
+                    horizontal-stretch: 0;
                     height: 32px;
                     border-radius: 16px;
                     background: Theme.surface-2;
                     y: (parent.height - self.height) / 2;
                     HorizontalLayout {
-                        padding-left: 13px;
-                        padding-right: 13px;
-                        spacing: 7px;
+                        padding-left: 14px;
+                        padding-right: 14px;
+                        spacing: 8px;
                         alignment: center;
-                        Rectangle {
-                            width: 8px; height: 8px; border-radius: 4px;
-                            background: root.daemon-online ? Theme.ok : Theme.danger;
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 8px;
+                                height: 8px;
+                                border-radius: 4px;
+                                background: root.daemon-online ? Theme.ok : Theme.danger;
+                            }
                         }
                         Text {
-                            text: root.daemon-online ? "Recording" : "Daemon offline";
+                            text: root.daemon-online ? "Running" : "Daemon offline";
                             font-size: 12px;
                             font-weight: 600;
                             color: Theme.text;

@@ -26,7 +26,7 @@ export component Card inherits Rectangle {
 export component ProgressRing inherits Rectangle {
     in property <string> progress-cmd: "";
     in property <length> size: 200px;
-    in property <color> track-color: Theme.surface-2;
+    in property <color> track-color: Theme.surface-3;
     in property <color> progress-color: Theme.accent;
     width: size;
     height: size;
@@ -40,7 +40,7 @@ export component ProgressRing inherits Rectangle {
         stroke: track-color;
         stroke-width: 10px;
         fill: transparent;
-        commands: "M 50 5 A 45 45 0 1 1 49.99 5.01";
+        commands: "M 50 5 A 45 45 0 1 1 50 95 A 45 45 0 1 1 50 5";
     }
     Path {
         width: 100%;
@@ -53,6 +53,11 @@ export component ProgressRing inherits Rectangle {
         stroke-width: 10px;
         fill: transparent;
         commands: root.progress-cmd;
+    }
+    VerticalLayout {
+        alignment: center;
+        spacing: 4px;
+        @children
     }
 }
 
@@ -70,10 +75,10 @@ export component Donut inherits Rectangle {
         viewbox-y: -1;
         viewbox-width: 102;
         viewbox-height: 102;
-        stroke: Theme.surface-2;
+        stroke: Theme.surface-3;
         stroke-width: 10px;
         fill: transparent;
-        commands: "M 50 5 A 45 45 0 1 1 49.99 5.01";
+        commands: "M 50 5 A 45 45 0 1 1 50 95 A 45 45 0 1 1 50 5";
     }
     for a in root.arcs: Path {
         width: 100%;
@@ -92,6 +97,10 @@ export component Donut inherits Rectangle {
         background: hole-color;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
+        VerticalLayout {
+            alignment: center;
+            @children
+        }
     }
 }
 

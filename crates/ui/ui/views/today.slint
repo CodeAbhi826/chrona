@@ -25,32 +25,25 @@ export component TodayView inherits Rectangle {
                     title: "Screen time — " + root.date-text;
                     preferred-width: 330px;
                     VerticalLayout {
-                        alignment: center;
                         spacing: 16px;
-                        Rectangle {
-                            height: 240px;
+                        HorizontalLayout {
+                            alignment: center;
                             ProgressRing {
                                 size: 216px;
                                 progress-cmd: root.ring-cmd;
-                                x: (parent.width - self.width) / 2;
-                                y: 6px;
-                            }
-                            Text {
-                                text: root.total-text;
-                                font-size: 36px;
-                                font-weight: 700;
-                                color: Theme.text;
-                                x: (parent.width - self.width) / 2;
-                                y: 86px;
-                                horizontal-alignment: center;
-                            }
-                            Text {
-                                text: root.ring-caption;
-                                font-size: 13px;
-                                color: Theme.text-dim;
-                                x: (parent.width - self.width) / 2;
-                                y: 138px;
-                                horizontal-alignment: center;
+                                Text {
+                                    text: root.total-text;
+                                    font-size: 34px;
+                                    font-weight: 700;
+                                    color: Theme.text;
+                                    horizontal-alignment: center;
+                                }
+                                Text {
+                                    text: root.ring-caption;
+                                    font-size: 13px;
+                                    color: Theme.text-dim;
+                                    horizontal-alignment: center;
+                                }
                             }
                         }
                         HorizontalLayout {
@@ -96,20 +89,18 @@ export component TodayView inherits Rectangle {
                         font-size: 13px;
                     }
                     VerticalLayout {
-                        spacing: 10px;
-                        Rectangle {
-                            height: 168px;
+                        spacing: 12px;
+                        HorizontalLayout {
+                            alignment: center;
                             Donut {
                                 size: 160px;
                                 arcs: root.cat-arcs;
-                                x: (parent.width - self.width) / 2;
                                 hole-color: Theme.surface;
                                 Text {
                                     text: "today";
                                     color: Theme.text-dim;
                                     font-size: 12px;
-                                    x: (parent.width - self.width) / 2;
-                                    y: (parent.height - self.height) / 2;
+                                    horizontal-alignment: center;
                                 }
                             }
                         }
@@ -145,7 +136,7 @@ export component TodayView inherits Rectangle {
             }
             Card {
                 title: "Timeline — activity by hour";
-                preferred-height: 190px;
+                preferred-height: 175px;
                 if root.hourly.length == 0: Text {
                     text: "No activity yet today.";
                     color: Theme.text-dim;
@@ -154,7 +145,7 @@ export component TodayView inherits Rectangle {
                 if root.hourly.length > 0: VerticalLayout {
                     spacing: 6px;
                     HorizontalLayout {
-                        height: 96px;
+                        height: 80px;
                         spacing: 4px;
                         for h in root.hourly: HourBar { v: h.v; }
                     }
