@@ -156,14 +156,16 @@ export component NavItem inherits Rectangle {
         padding-left: 14px;
         padding-right: 14px;
         spacing: 11px;
-        alignment: center;
-        Rectangle {
-            width: 9px; height: 9px; border-radius: 5px;
-            background: active ? Theme.on-accent : (touch.has-hover ? Theme.text-dim : Theme.stroke);
+        alignment: start;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 9px; height: 9px; border-radius: 5px;
+                background: active ? Theme.on-accent : (touch.has-hover ? Theme.text-dim : Theme.stroke);
+            }
         }
         Text {
             text: label;
-            horizontal-stretch: 1;
             vertical-alignment: center;
             color: active ? Theme.on-accent : Theme.text-dim;
             font-size: 14px;
@@ -219,21 +221,23 @@ export component AppRow inherits Rectangle {
         padding-left: 8px;
         padding-right: 8px;
         spacing: 10px;
-        alignment: center;
-        Rectangle {
-            width: 24px; height: 24px;
-            border-radius: 6px;
-            if !root.has-icon: Rectangle {
-                width: 10px; height: 10px; border-radius: 5px;
-                background: dot-color;
-                x: (parent.width - self.width) / 2;
-                y: (parent.height - self.height) / 2;
-            }
-            if root.has-icon: Image {
-                source: root.icon;
-                width: parent.width;
-                height: parent.height;
-                image-fit: contain;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 24px; height: 24px;
+                border-radius: 6px;
+                if !root.has-icon: Rectangle {
+                    width: 10px; height: 10px; border-radius: 5px;
+                    background: dot-color;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+                if root.has-icon: Image {
+                    source: root.icon;
+                    width: parent.width;
+                    height: parent.height;
+                    image-fit: contain;
+                }
             }
         }
         Text {
@@ -244,9 +248,12 @@ export component AppRow inherits Rectangle {
             color: Theme.text;
             font-size: 13px;
         }
-        HBar {
-            share: root.share;
+        VerticalLayout {
+            alignment: center;
             horizontal-stretch: 1;
+            HBar {
+                share: root.share;
+            }
         }
         Text {
             text: time-text;
