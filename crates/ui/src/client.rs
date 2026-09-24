@@ -566,8 +566,8 @@ pub fn tick(app: &ChronaApp) {
         app.set_week_delta_up(delta > 0);
         app.set_week_delta_text(sstr(if prev > 0 {
             format!(
-                "{} vs last week ({})",
-                if delta >= 0 { "+" } else { "" },
+                "{}{} vs last week",
+                if delta >= 0 { "+" } else { "-" },
                 fmt_dur(delta.abs())
             )
         } else {
@@ -733,6 +733,10 @@ pub fn tick(app: &ChronaApp) {
                             app.set_app_paused_visible(true);
                             app.window().show().ok();
                         }
+                    } else if app.get_app_paused_visible()
+                        && app.get_app_paused_id().as_str() != curr_app
+                    {
+                        app.set_app_paused_visible(false);
                     }
                 }
             }

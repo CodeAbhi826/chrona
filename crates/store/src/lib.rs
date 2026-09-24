@@ -312,7 +312,7 @@ impl Store {
         let conn = self.conn.lock().unwrap();
         let row: Option<(i64, i64)> = conn
             .query_row(
-                "SELECT id, limit_seconds FROM goals WHERE key = ?1",
+                "SELECT id, limit_seconds FROM goals WHERE key = ?1 AND kind = 'app'",
                 params![key],
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )

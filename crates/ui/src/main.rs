@@ -146,6 +146,7 @@ fn main() -> Result<(), slint::PlatformError> {
         let weak = app.as_weak();
         app.on_search_apps(move |q| {
             if let Some(app) = weak.upgrade() {
+                app.set_apps_search(q.clone());
                 client::apply_search(&app, &q);
             }
         });

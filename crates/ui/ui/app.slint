@@ -164,11 +164,11 @@ export component ChronaApp inherits Window {
                                 width: 8px;
                                 height: 8px;
                                 border-radius: 4px;
-                                background: root.daemon-online ? Theme.ok : Theme.danger;
+                                background: !root.daemon-online ? Theme.danger : (root.tracking-paused ? Theme.warn : Theme.ok);
                             }
                         }
                         Text {
-                            text: root.daemon-online ? "Running" : "Daemon offline";
+                            text: !root.daemon-online ? "Daemon offline" : (root.tracking-paused ? "Paused" : "Running");
                             font-size: 12px;
                             font-weight: 600;
                             color: Theme.text;

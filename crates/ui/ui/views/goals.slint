@@ -96,11 +96,15 @@ export component GoalsView inherits Rectangle {
                         width: 140px;
                         model: ["category", "app", "total"];
                         current-value: "category";
-                        selected(value) => { root.kind-changed(value); }
+                        selected(value) => {
+                            root.kind-changed(value);
+                            key-input.current-value = "";
+                        }
                     }
                     key-input := ComboBox {
                         width: 200px;
                         model: root.suggestions;
+                        enabled: kind-input.current-value != "total";
                     }
                     mins-input := LineEdit {
                         placeholder-text: "minutes per day";

@@ -49,9 +49,9 @@ export component MonthView inherits Rectangle {
                                         for c in w.cells: Rectangle {
                                             height: 20px;
                                             border-radius: 5px;
-                                            background: c.v > 0
+                                            background: c.v < 0 ? #00000000 : (c.v > 0
                                                 ? Theme.accent.with-alpha(0.12 + 0.88 * min(1, c.v))
-                                                : Theme.surface-2;
+                                                : Theme.surface-2);
                                             border-width: c.is-today ? 2px : 0px;
                                             border-color: Theme.accent;
                                         }
@@ -60,7 +60,7 @@ export component MonthView inherits Rectangle {
                             }
                         }
                         Text {
-                            text: "darker = more screen time";
+                            text: "more color = more screen time";
                             font-size: 10.5px;
                             color: Theme.text-dim;
                         }
