@@ -23,7 +23,7 @@
 #                                   from a repo checkout, a vX.Y.Z tag on HEAD
 #                                   is preferred over "latest" (waits for CI
 #                                   if the tag was pushed seconds ago)
-#   bash install.sh v0.2.2         # pin a specific release
+#   bash install.sh v0.2.4         # pin a specific release
 #   bash install.sh --user         # no-root install into ~/.local
 #
 # From a repo checkout:  bash install.sh
@@ -148,7 +148,7 @@ raw() { echo "https://raw.githubusercontent.com/$REPO/main/$1"; }
 
 # --------------------------------------------------------------- release ------
 # Which release to install:
-#   1. a pinned argument (bash install.sh v0.2.2) always wins
+#   1. a pinned argument (bash install.sh v0.2.4) always wins
 #   2. a vX.Y.Z tag on HEAD of a repo checkout — the natural target when the
 #      installer is run right after tagging: /releases/latest still points at
 #      the PREVIOUS version while CI builds the new one, so a bare "latest"
