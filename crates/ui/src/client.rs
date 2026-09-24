@@ -714,7 +714,12 @@ pub fn tick(app: &ChronaApp) {
         if let Some(cw) = status.get("current_window") {
             if let Some(curr_app) = cw.get("app_id").and_then(Value::as_str) {
                 if curr_app != "chrona" {
-                    if let Some(_exceeded) = v.iter().find(|g| g.enabled && g.exceeded && g.kind.as_str() == "app" && g.key.as_str() == curr_app) {
+                    if let Some(_exceeded) = v.iter().find(|g| {
+                        g.enabled
+                            && g.exceeded
+                            && g.kind.as_str() == "app"
+                            && g.key.as_str() == curr_app
+                    }) {
                         let name = pretty_name(curr_app);
                         let icon_opt = meta_of(curr_app).and_then(|m| m.icon);
                         app.set_app_paused_id(sstr(curr_app));

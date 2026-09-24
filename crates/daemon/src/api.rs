@@ -431,7 +431,11 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
         }
         "goal.extend" => {
             let key = str_arg(a, "key")?;
-            let seconds = a.get("seconds").and_then(Value::as_i64).unwrap_or(300).clamp(60, 3600);
+            let seconds = a
+                .get("seconds")
+                .and_then(Value::as_i64)
+                .unwrap_or(300)
+                .clamp(60, 3600);
             let id = sh.store.extend_goal(&key, seconds)?;
             Ok(json!({"id": id, "extended_seconds": seconds}))
         }
