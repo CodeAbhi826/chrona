@@ -452,9 +452,7 @@ fn handle_cmd(sh: &Shared, cmd: &str, a: &Value) -> anyhow::Result<Value> {
                 format!("{kind}:{key}")
             };
             let current_used = today.get(&map_key).copied().unwrap_or(0);
-            let id = sh
-                .store
-                .extend_goal(kind, &key, seconds, current_used)?;
+            let id = sh.store.extend_goal(kind, &key, seconds, current_used)?;
             Ok(json!({"id": id, "extended_seconds": seconds}))
         }
 

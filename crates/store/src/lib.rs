@@ -467,9 +467,7 @@ mod tests {
         let s = tmp_store("extend");
         let id = s.set_goal("category", "browsers", 1800, true).unwrap();
         // Usage at 2000s (> 1800s limit). Extending by 300s gives 2000 + 300 = 2300s.
-        let updated = s
-            .extend_goal("category", "browsers", 300, 2000)
-            .unwrap();
+        let updated = s.extend_goal("category", "browsers", 300, 2000).unwrap();
         assert_eq!(updated, Some(id));
         let goals = s.goals().unwrap();
         assert_eq!(goals[0].limit_seconds, 2300);
