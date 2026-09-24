@@ -708,7 +708,30 @@ pub fn tick(app: &ChronaApp) {
             .collect::<Vec<_>>();
         // Screen-time (total) goal first — it is the headline limit.
         v.sort_by_key(|g| if g.kind.as_str() == "total" { 0 } else { 1 });
-        app.set_goals(rc(v));
+        app.set_goals(rc(v.clone()));
+
+        // Digital Wellbeing: App Paused modal check
+        if let Some(cw) = status.get("current_window") {
+            if let Some(curr_app) = cw.get("app_id").and_then(Value::as_str) {
+                if curr_app != "chrona" {
+                    if let Some(_exceeded) = v.iter().find(|g| g.enabled && g.exceeded && g.kind.as_str() == "app" && g.key.as_str() == curr_app) {
+                        let name = pretty_name(curr_app);
+                        let icon_opt = meta_of(curr_app).and_then(|m| m.icon);
+                        app.set_app_paused_id(sstr(curr_app));
+                        app.set_app_paused_name(sstr(name));
+                        app.set_app_paused_has_icon(icon_opt.is_some());
+                        if let Some(ic) = icon_opt {
+                            app.set_app_paused_icon(ic);
+                        }
+                        if !app.get_app_paused_visible() {
+                            app.set_app_paused_visible(true);
+                            app.window().show().ok();
+                        }
+                    }
+                }
+            }
+        }
+
         // Fill suggestions once; afterwards only the kind-changed callback
         // touches them, so we never reset the user's ComboBox mid-edit.
         if app.get_goal_suggestions().row_count() == 0 {

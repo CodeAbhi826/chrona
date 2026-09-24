@@ -1,0 +1,35 @@
+# Maintainer: Chrona contributors <https://github.com/CodeAbhi826/chrona>
+pkgname=chrona-bin
+pkgver=0.2.4
+pkgrel=1
+pkgdesc="Digital wellbeing for every Linux desktop - screen time, per-app stats and daily goals (precompiled binary)"
+arch=(x86_64)
+url="https://github.com/CodeAbhi826/chrona"
+license=(MIT)
+depends=(gcc-libs fontconfig libxkbcommon wayland)
+optdepends=(
+    "dbus: KWin script / GNOME extension intake and screensaver-based idle detection"
+    "kwin: Chrona KWin script for Plasma Wayland window tracking"
+    "gnome-shell: Chrona extension for GNOME Wayland window tracking"
+)
+provides=(chrona)
+conflicts=(chrona)
+source=("$pkgname-$pkgver.tar.gz::$url/releases/download/v$pkgver/chrona-v$pkgver-x86_64-linux-gnu.tar.gz"
+        "https://raw.githubusercontent.com/CodeAbhi826/chrona/v$pkgver/packaging/chrona.service"
+        "https://raw.githubusercontent.com/CodeAbhi826/chrona/v$pkgver/packaging/chrona.desktop"
+        "https://raw.githubusercontent.com/CodeAbhi826/chrona/v$pkgver/assets/icon.svg")
+sha256sums=('4468d3a559f55ffd6c80446b1b84c8b222cdc58510b07140719a56ca0716eab3'
+            'SKIP'
+            'SKIP'
+            'SKIP')
+
+package() {
+    install -Dm755 chronad -t "$pkgdir/usr/bin/"
+    install -Dm755 chrona -t "$pkgdir/usr/bin/"
+
+    install -Dm644 chrona.service -t "$pkgdir/usr/lib/systemd/user/"
+    install -Dm644 chrona.desktop -t "$pkgdir/usr/share/applications/"
+    install -Dm644 icon.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/chrona.svg"
+
+    install -Dm644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname/"
+}

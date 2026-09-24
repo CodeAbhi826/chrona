@@ -197,6 +197,26 @@ fn main() -> Result<(), slint::PlatformError> {
         });
     }
 
+    // ---- app paused (Digital Wellbeing) ----
+    {
+        let weak = app.as_weak();
+        app.on_dismiss_app_paused(move || {
+            if let Some(app) = weak.upgrade() {
+                app.set_app_paused_visible(false);
+            }
+        });
+    }
+    {
+        let weak = app.as_weak();
+        app.on_extend_app_limit(move |id| {
+            if let Some(app) = weak.upgrade() {
+                app.set_app_paused_visible(false);
+                let _ = client::request("goal.extend", json!({"key": id.as_str(), "seconds": 300}));
+                REFRESH.store(true, Ordering::SeqCst);
+            }
+        });
+    }
+
     // ---- settings actions ----
     {
         let weak = app.as_weak();

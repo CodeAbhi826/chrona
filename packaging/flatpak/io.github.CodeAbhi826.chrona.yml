@@ -1,0 +1,48 @@
+app-id: io.github.CodeAbhi826.chrona
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: chrona
+
+finish-args:
+  # Display servers
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+
+  # Desktop notifications (budget warnings, escalating limits)
+  - --talk-name=org.freedesktop.Notifications
+
+  # Compositor window tracking intake
+  - --talk-name=org.kde.KWin
+  - --talk-name=org.gnome.Shell
+  - --talk-name=org.freedesktop.ScreenSaver
+
+  # Local data directory for SQLite database
+  - --filesystem=xdg-data/chrona:create
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/chrona/cargo
+
+modules:
+  - name: chrona
+    buildsystem: simple
+    build-commands:
+      - cargo build --release --locked --workspace
+      - install -Dm755 target/release/chrona /app/bin/chrona
+      - install -Dm755 target/release/chronad /app/bin/chronad
+      - install -Dm644 packaging/chrona.desktop /app/share/applications/io.github.CodeAbhi826.chrona.desktop
+      - install -Dm644 assets/icon.svg /app/share/icons/hicolor/scalable/apps/io.github.CodeAbhi826.chrona.svg
+      - install -Dm644 assets/icon-128.png /app/share/icons/hicolor/128x128/apps/io.github.CodeAbhi826.chrona.png
+      - install -Dm644 assets/icon-256.png /app/share/icons/hicolor/256x256/apps/io.github.CodeAbhi826.chrona.png
+      - install -Dm644 assets/icon-512.png /app/share/icons/hicolor/512x512/apps/io.github.CodeAbhi826.chrona.png
+      - install -Dm644 packaging/io.github.CodeAbhi826.chrona.metainfo.xml /app/share/metainfo/io.github.CodeAbhi826.chrona.metainfo.xml
+    sources:
+      - type: git
+        url: https://github.com/CodeAbhi826/chrona.git
+        tag: v0.2.4

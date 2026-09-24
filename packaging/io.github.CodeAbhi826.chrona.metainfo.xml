@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.CodeAbhi826.chrona</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Chrona</name>
+  <summary>Digital wellbeing for every Linux desktop</summary>
+  <description>
+    <p>
+      Chrona is a 100% local, digital wellbeing and screen-time tracker for the Linux desktop.
+      It records window usage, categorizes activity, and lets you set daily goals with escalating reminders.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.CodeAbhi826.chrona.desktop</launchable>
+  <url type="homepage">https://github.com/CodeAbhi826/chrona</url>
+  <url type="bugtracker">https://github.com/CodeAbhi826/chrona/issues</url>
+  <developer id="io.github.CodeAbhi826">
+    <name>CodeAbhi826</name>
+  </developer>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/CodeAbhi826/chrona/main/docs/screenshots/today-dark.png</image>
+      <caption>Today view in dark theme</caption>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="0.2.4" date="2026-09-24">
+      <description>
+        <p>Improved UI alignment, reliable circular tracks, responsive window bounds, and stability enhancements.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

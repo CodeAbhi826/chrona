@@ -307,6 +307,28 @@ impl Store {
         Ok(())
     }
 
+    /// Add extra seconds to a goal limit (e.g. "+5 minutes" extension).
+    pub fn extend_goal(&self, key: &str, extra_seconds: i64) -> anyhow::Result<Option<i64>> {
+        let conn = self.conn.lock().unwrap();
+        let row: Option<(i64, i64)> = conn
+            .query_row(
+                "SELECT id, limit_seconds FROM goals WHERE key = ?1",
+                params![key],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?;
+        if let Some((id, cur_limit)) = row {
+            let new_limit = cur_limit + extra_seconds;
+            conn.execute(
+                "UPDATE goals SET limit_seconds = ?1 WHERE id = ?2",
+                params![new_limit, id],
+            )?;
+            Ok(Some(id))
+        } else {
+            Ok(None)
+        }
+    }
+
     // ----- settings -------------------------------------------------------------
 
     pub fn setting(&self, key: &str) -> anyhow::Result<Option<String>> {

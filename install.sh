@@ -46,11 +46,13 @@ die()  { printf '%serror: %s%s\n' "$RED" "$*" "$RST" >&2; exit 1; }
 
 # ------------------------------------------------------------------ options ---
 MODE=system
+DEV=0
 TAG=""
 for arg in "$@"; do
     case "$arg" in
         --user) MODE=user ;;
         --system) MODE=system ;;
+        --dev) DEV=1 ;;
         v[0-9]*) TAG="$arg" ;;
         [0-9]*.[0-9]*.[0-9]*) TAG="v$arg" ;;
         -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
@@ -186,26 +188,33 @@ URL="https://github.com/$REPO/releases/download/$TAG/$ASSET"
 TMP="$(mktemp -d)"
 trap 'command rm -rf -- "$TMP"' EXIT   # plain `rm`, immune to interactive aliases
 
-# If the release was tagged seconds ago, CI may still be building it. Wait.
-tries=0
-until url_up "$URL"; do
-    tries=$((tries + 1))
-    if [ "$tries" -eq 1 ]; then
-        log "release $TAG is still being built by CI — waiting for it to publish"
-        printf '    (this normally takes 5–8 minutes after pushing a tag)\n'
-    fi
-    [ "$tries" -gt 45 ] && die "release $TAG never appeared (CI failed? check: https://github.com/$REPO/actions)"
-    sleep 20
-done
+if [ "$DEV" = 1 ]; then
+    log "downloading latest dev build from branch dev"
+    command -v gh >/dev/null || die "--dev requires gh (GitHub CLI) to download workflow artifacts"
+    gh run download -R "$REPO" --name chrona-linux-dev -D "$TMP" || die "failed to download dev artifact — check https://github.com/$REPO/actions"
+    chmod +x "$TMP/chrona" "$TMP/chronad" 2>/dev/null || true
+else
+    # If the release was tagged seconds ago, CI may still be building it. Wait.
+    tries=0
+    until url_up "$URL"; do
+        tries=$((tries + 1))
+        if [ "$tries" -eq 1 ]; then
+            log "release $TAG is still being built by CI — waiting for it to publish"
+            printf '    (this normally takes 5–8 minutes after pushing a tag)\n'
+        fi
+        [ "$tries" -gt 45 ] && die "release $TAG never appeared (CI failed? check: https://github.com/$REPO/actions)"
+        sleep 20
+    done
 
-log "downloading chrona $VER"
-case "$DL" in
-    gh) gh release download "$TAG" -R "$REPO" -p "$ASSET" -D "$TMP" ;;
-    *)  fetch "$URL" "$TMP/$ASSET" ;;
-esac
-[ -f "$TMP/$ASSET" ] || die "download failed"
-tar -C "$TMP" -xzf "$TMP/$ASSET"
-[ -x "$TMP/chronad" ] && [ -x "$TMP/chrona" ] || die "release tarball is missing the binaries"
+    log "downloading chrona $VER"
+    case "$DL" in
+        gh) gh release download "$TAG" -R "$REPO" -p "$ASSET" -D "$TMP" ;;
+        *)  fetch "$URL" "$TMP/$ASSET" ;;
+    esac
+    [ -f "$TMP/$ASSET" ] || die "download failed"
+    tar -C "$TMP" -xzf "$TMP/$ASSET"
+fi
+[ -x "$TMP/chronad" ] && [ -x "$TMP/chrona" ] || die "binaries not found or not executable in package"
 
 # --------------------------------------------------------- runtime libraries ---
 missing_libs() { ldd "$1" 2>/dev/null | grep 'not found' | awk '{print $1}' | sort -u; }
