@@ -167,9 +167,11 @@ impl Dispatch<ZwlrForeignToplevelHandleV1, ()> for App {
                 }
             }
             zwlr_foreign_toplevel_handle_v1::Event::State { state: states } => {
-                let activated = states.chunks_exact(4).any(|chunk| {
-                    u32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) == STATE_ACTIVATED
-                });
+                let activated = states
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .any(|chunk| u32::from_ne_bytes(*chunk) == STATE_ACTIVATED);
                 if activated {
                     state.activated = Some(id.clone());
                     state.report_activated();
