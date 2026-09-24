@@ -385,7 +385,11 @@ fn install_kwin_script() -> String {
 fn install_gnome_extension() -> String {
     const UUID: &str = "chrona@chrona.local";
     let home_share = std::env::var("HOME")
-        .map(|h| std::path::PathBuf::from(h).join(".local/share/chrona/gnome").join(UUID))
+        .map(|h| {
+            std::path::PathBuf::from(h)
+                .join(".local/share/chrona/gnome")
+                .join(UUID)
+        })
         .unwrap_or_else(|_| std::path::PathBuf::from("/nonexistent"));
     let candidates = [
         home_share,
